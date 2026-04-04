@@ -142,7 +142,19 @@
 
     sunGroup.add(sun, corona, glow);
     solarSystemRoot.add(sunGroup);
-    return { sunGroup, sun, glow, corona };
+    const sunState = {
+      maxHp: 20,
+      currentHp: 20,
+      unlocked: false,
+      exploded: false,
+      baseColor: new THREE.Color(0xffc655),
+      criticalColor: new THREE.Color(0xff5147),
+      baseEmissive: new THREE.Color(0xff8c1a),
+      criticalEmissive: new THREE.Color(0xff341f),
+      flash: 0,
+    };
+    sun.userData.sunState = sunState;
+    return { sunGroup, sun, glow, corona, state: sunState };
   }
 
   const sunParts = createSun();
@@ -273,14 +285,14 @@
   }
 
   const planetDefinitions = [
-    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 10, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
-    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 12, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
-    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 12, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
-    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 10, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
-    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 30, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
-    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 28, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
-    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 24, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
-    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 24, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
+    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 1, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
+    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 2, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
+    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 2, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
+    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 1, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
+    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 3, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
+    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 2, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
+    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 2, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
+    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 2, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
   ];
 
   planetDefinitions.forEach(createPlanet);
@@ -576,11 +588,16 @@
 
   function getShootableHit() {
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.intersectObjects(planetMeshes.concat(asteroidMeshes), false);
+    const hitMeshes = planetMeshes.concat(asteroidMeshes);
+    if (sunParts.state.unlocked && !sunParts.state.exploded) {
+      hitMeshes.push(sunParts.sun);
+    }
+    const intersects = raycaster.intersectObjects(hitMeshes, false);
     return intersects.find(function (item) {
       const planet = item.object.userData.planet;
       const asteroid = item.object.userData.asteroid;
-      return (planet && !planet.exploded) || (asteroid && asteroid.active);
+      const sunState = item.object.userData.sunState;
+      return (planet && !planet.exploded) || (asteroid && asteroid.active) || (sunState && sunState.unlocked && !sunState.exploded);
     }) || null;
   }
 
@@ -588,6 +605,7 @@
     const hit = getShootableHit();
     const nextPlanet = hit && hit.object.userData.planet ? hit.object.userData.planet : null;
     const nextAsteroid = hit && hit.object.userData.asteroid ? hit.object.userData.asteroid : null;
+    const nextSun = hit && hit.object.userData.sunState ? hit.object.userData.sunState : null;
     state.hoveredPlanet = nextPlanet && !nextPlanet.exploded ? nextPlanet : null;
 
     if (state.gameOver) {
@@ -604,6 +622,11 @@
 
     if (nextAsteroid && nextAsteroid.active) {
       statusBadge.textContent = "Target asteroid: 1 hit to smash. Bonus fire speed if you land it!";
+      return;
+    }
+
+    if (nextSun && nextSun.unlocked && !nextSun.exploded) {
+      statusBadge.textContent = "Final target Sun: " + Math.max(0, Math.ceil(nextSun.currentHp)) + " hits left. Finish the mission!";
       return;
     }
 
@@ -632,6 +655,7 @@
     const hitTarget = getShootableHit();
     const target = hitTarget && hitTarget.object.userData.planet ? hitTarget.object.userData.planet : null;
     const asteroid = hitTarget && hitTarget.object.userData.asteroid ? hitTarget.object.userData.asteroid : null;
+    const sunTarget = hitTarget && hitTarget.object.userData.sunState ? hitTarget.object.userData.sunState : null;
 
     const shotOrigin = camera.position.clone().add(shotDirection.clone().multiplyScalar(2.2));
     let endPoint = shotOrigin.clone().add(shotDirection.clone().multiplyScalar(90));
@@ -642,6 +666,23 @@
       didHit = true;
       state.hits += 1;
       burstAsteroid(asteroid, endPoint);
+    } else if (sunTarget && sunTarget.unlocked && !sunTarget.exploded) {
+      endPoint = hitTarget.point.clone();
+      didHit = true;
+      sunTarget.currentHp = Math.max(0, sunTarget.currentHp - 1);
+      sunTarget.flash = 1;
+      state.hits += 1;
+      state.streak += 1;
+      state.score += state.weapon === "light" ? 18 : 24;
+
+      if (sunTarget.currentHp === 0) {
+        explodeSun(endPoint);
+        state.score += sunTarget.maxHp * 22;
+      } else if (sunTarget.currentHp / sunTarget.maxHp <= 0.1) {
+        missionMessage.textContent = "The Sun is turning red-hot. Keep firing!";
+      } else {
+        missionMessage.textContent = "The Sun was hit. " + Math.ceil(sunTarget.currentHp) + " hits to go.";
+      }
     } else if (target && !target.exploded) {
       endPoint = hitTarget.point.clone();
       didHit = true;
@@ -780,16 +821,31 @@
     createPlanetExplosionBurst(explosionPoint, planet);
 
     if (state.explosions === activePlanets.length) {
-      state.gameOver = true;
-      state.scoreSaved = false;
-      const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
-      state.score += 250;
-      missionMessage.textContent = "Mission complete in " + timeSpent + "s. Rating: " + getRatingText() + ". Save your leaderboard score!";
-      stopAsteroids();
-      showVictoryCelebration(timeSpent);
-      unlockPointer();
-      updateLeaderboardAccess();
+      sunParts.state.unlocked = true;
+      missionMessage.textContent = "All 8 planets are gone. Now shoot the Sun 20 times to finish the mission!";
+      refreshHud();
     }
+  }
+
+  function explodeSun(at) {
+    const explosionPoint = at || new THREE.Vector3(0, 0, 0);
+    sunParts.state.exploded = true;
+    sunParts.sun.visible = false;
+    sunParts.corona.visible = false;
+    sunParts.glow.visible = false;
+
+    playExplosionSound();
+    createSunExplosionBurst(explosionPoint);
+
+    state.gameOver = true;
+    state.scoreSaved = false;
+    const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
+    state.score += 250;
+    missionMessage.textContent = "Sun destroyed in " + timeSpent + "s. Mission complete! Save your leaderboard score.";
+    stopAsteroids();
+    showVictoryCelebration(timeSpent);
+    unlockPointer();
+    updateLeaderboardAccess();
   }
 
   function showVictoryCelebration(timeSpent) {
@@ -827,6 +883,21 @@
   }
 
   function createPlanetExplosionBurst(position, planet) {
+    const burstShell = new THREE.Mesh(
+      new THREE.SphereGeometry(planet.definition.size * 1.02, 28, 28),
+      new THREE.MeshBasicMaterial({
+        map: planet.bodyMesh.material.map,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.82,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    burstShell.position.copy(position);
+    burstShell.quaternion.copy(planet.bodyMesh.getWorldQuaternion(new THREE.Quaternion()));
+    scene.add(burstShell);
+
     createExplosionBurst(position, planet.definition.colors[1], {
       count: 180,
       particleSize: 1.25 + planet.definition.size * 0.18,
@@ -835,6 +906,7 @@
       life: 1.55,
       flashScale: planet.definition.size * 2.7,
       shockwaveScale: planet.definition.size * 3.8,
+      burstMesh: burstShell,
     });
     createExplosionBurst(position, planet.definition.colors[2], {
       count: 120,
@@ -843,6 +915,61 @@
       maxSpeed: 14 + planet.definition.size,
       life: 1.2,
     });
+  }
+
+  function createSunExplosionBurst(position) {
+    const burstShell = new THREE.Mesh(
+      new THREE.SphereGeometry(5.3, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd66e,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    burstShell.position.copy(position);
+    scene.add(burstShell);
+
+    createExplosionBurst(position, "#ffd86b", {
+      count: 320,
+      particleSize: 2.1,
+      minSpeed: 12,
+      maxSpeed: 28,
+      life: 1.95,
+      flashScale: 14,
+      shockwaveScale: 22,
+      burstMesh: burstShell,
+    });
+    createExplosionBurst(position, "#ff8c2a", {
+      count: 220,
+      particleSize: 1.35,
+      minSpeed: 8,
+      maxSpeed: 22,
+      life: 1.55,
+      flashScale: 8,
+    });
+  }
+
+  function updateSunVisual(delta) {
+    const sunState = sunParts.state;
+    sunState.flash = Math.max(0, sunState.flash - delta * 2.4);
+
+    if (!sunState.unlocked || sunState.exploded) {
+      sunParts.sun.material.color.copy(sunState.baseColor);
+      sunParts.sun.material.emissive.copy(sunState.baseEmissive);
+      sunParts.sun.material.emissiveIntensity = 1.7;
+      return;
+    }
+
+    const hpRatio = sunState.currentHp / sunState.maxHp;
+    const critical = hpRatio <= 0.1 ? 1 : 0;
+    sunParts.sun.material.color.copy(sunState.baseColor).lerp(sunState.criticalColor, 0.4 + critical * 0.45);
+    sunParts.sun.material.emissive.copy(sunState.baseEmissive).lerp(sunState.criticalEmissive, critical * 0.7);
+    sunParts.sun.material.emissiveIntensity = 1.7 + critical * 0.6 + sunState.flash * 0.9;
+    sunParts.corona.material.opacity = 0.18 + critical * 0.14 + sunState.flash * 0.12;
+    sunParts.glow.material.opacity = 1;
+    sunParts.glow.scale.setScalar(24 + critical * 2.4 + sunState.flash * 3.2);
   }
 
   function createExplosionBurst(position, color, options) {
@@ -920,6 +1047,7 @@
       points: points,
       positions: positions,
       velocities: velocities,
+      burstMesh: settings.burstMesh || null,
       flash: flash,
       shockwave: shockwave,
       life: settings.life || 1.15,
@@ -1061,7 +1189,9 @@
     scoreValue.textContent = String(state.score);
     hitsValue.textContent = String(state.hits);
     streakValue.textContent = String(state.streak);
-    explosionValue.textContent = state.explosions + " / " + activePlanets.length;
+    explosionValue.textContent = sunParts.state.unlocked && !sunParts.state.exploded
+      ? state.explosions + " / " + activePlanets.length + " + Sun"
+      : state.explosions + " / " + activePlanets.length;
     updateMissionReport();
   }
 
@@ -1096,6 +1226,12 @@
         escapeHtml(value) +
         "</strong></div>";
     }).join("");
+
+    planetReport.innerHTML += "<div class=\"planet-item " +
+      (sunParts.state.exploded ? "done" : sunParts.state.unlocked ? "critical" : "") +
+      "\"><span>Sun</span><strong>" +
+      escapeHtml(sunParts.state.exploded ? "0/" + sunParts.state.maxHp : sunParts.state.unlocked ? Math.ceil(sunParts.state.currentHp) + "/" + sunParts.state.maxHp : "LOCKED") +
+      "</strong></div>";
   }
 
   function getRatingValue() {
@@ -1200,6 +1336,14 @@
     mouseLook.pitch = -0.12;
     hideVictoryCelebration();
     updateLeaderboardAccess();
+    sunParts.state.currentHp = sunParts.state.maxHp;
+    sunParts.state.unlocked = false;
+    sunParts.state.exploded = false;
+    sunParts.state.flash = 0;
+    sunParts.sun.visible = true;
+    sunParts.corona.visible = true;
+    sunParts.glow.visible = true;
+    updateSunVisual(0);
 
     activePlanets.forEach(function (planet) {
       planet.currentHp = planet.maxHp;
@@ -1221,6 +1365,11 @@
 
     activeExplosions.forEach(function (explosion) {
       scene.remove(explosion.points);
+      if (explosion.burstMesh) {
+        scene.remove(explosion.burstMesh);
+        explosion.burstMesh.geometry.dispose();
+        explosion.burstMesh.material.dispose();
+      }
       if (explosion.flash) {
         scene.remove(explosion.flash);
         explosion.flash.geometry.dispose();
@@ -1364,6 +1513,7 @@
     sunParts.sun.rotation.y += delta * 0.22;
     sunParts.corona.scale.setScalar(1 + Math.sin(performance.now() * 0.0038) * 0.04);
     sunParts.glow.material.rotation += delta * 0.03;
+    updateSunVisual(delta);
 
     activePlanets.forEach(function (planet) {
       planet.orbitGroup.rotation.y += delta * planet.definition.orbitSpeed * 0.18 * speed;
@@ -1452,6 +1602,10 @@
       explosion.points.geometry.attributes.position.needsUpdate = true;
       explosion.points.material.opacity = ratio;
       explosion.points.material.size = 0.8 + (1 - ratio) * 0.8;
+      if (explosion.burstMesh) {
+        explosion.burstMesh.material.opacity = ratio * 0.9;
+        explosion.burstMesh.scale.setScalar(1 + (1 - ratio) * 2.6);
+      }
       if (explosion.flash) {
         explosion.flash.material.opacity = ratio * 0.42;
         explosion.flash.scale.setScalar(1 + (1 - ratio) * 2.2);
@@ -1473,6 +1627,11 @@
         activeExplosions.splice(index, 1);
       }
       scene.remove(explosion.points);
+      if (explosion.burstMesh) {
+        scene.remove(explosion.burstMesh);
+        explosion.burstMesh.geometry.dispose();
+        explosion.burstMesh.material.dispose();
+      }
       if (explosion.flash) {
         scene.remove(explosion.flash);
         explosion.flash.geometry.dispose();
