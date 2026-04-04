@@ -619,6 +619,8 @@
   }
 
   function createBeam(origin, target, weapon, hit) {
+    const beamColor = weapon === "light" ? 0x7cf5ff : 0xff8f4b;
+    const glowColor = weapon === "light" ? 0xa6ffff : 0xffd978;
     const positions = new Float32Array([
       origin.x, origin.y, origin.z,
       target.x, target.y, target.z,
@@ -627,31 +629,66 @@
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     const material = new THREE.LineBasicMaterial({
-      color: weapon === "light" ? 0x7cf5ff : 0xff8f4b,
+      color: beamColor,
       transparent: true,
-      opacity: 0.95,
+      opacity: 1,
       blending: THREE.AdditiveBlending,
     });
 
     const line = new THREE.Line(geometry, material);
     scene.add(line);
 
-    const pulse = new THREE.Mesh(
-      new THREE.SphereGeometry(hit ? 0.55 : 0.3, 12, 12),
+    const markers = [];
+    const markerCount = 4;
+    for (let i = 0; i < markerCount; i += 1) {
+      const t = (i + 1) / (markerCount + 1);
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(weapon === "light" ? 0.18 : 0.24, 10, 10),
+        new THREE.MeshBasicMaterial({
+          color: glowColor,
+          transparent: true,
+          opacity: 0.9,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      marker.position.lerpVectors(origin, target, t);
+      scene.add(marker);
+      markers.push(marker);
+    }
+
+    const muzzle = new THREE.Mesh(
+      new THREE.SphereGeometry(weapon === "light" ? 0.34 : 0.46, 12, 12),
       new THREE.MeshBasicMaterial({
-        color: weapon === "light" ? 0xa6ffff : 0xffd978,
+        color: glowColor,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.88,
         blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    muzzle.position.copy(origin);
+    scene.add(muzzle);
+
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(hit ? 0.7 : 0.4, 14, 14),
+      new THREE.MeshBasicMaterial({
+        color: glowColor,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       })
     );
     pulse.position.copy(target);
     scene.add(pulse);
 
     activeBeams.push({
-      life: 0.16,
-      maxLife: 0.16,
+      life: 0.22,
+      maxLife: 0.22,
       line: line,
+      markers: markers,
+      muzzle: muzzle,
       pulse: pulse,
     });
   }
@@ -1065,9 +1102,16 @@
     activeExplosions.length = 0;
 
     activeBeams.forEach(function (beam) {
-      scene.remove(beam.line, beam.pulse);
+      scene.remove(beam.line, beam.muzzle, beam.pulse);
+      beam.markers.forEach(function (marker) {
+        scene.remove(marker);
+        marker.geometry.dispose();
+        marker.material.dispose();
+      });
       beam.line.geometry.dispose();
       beam.line.material.dispose();
+      beam.muzzle.geometry.dispose();
+      beam.muzzle.material.dispose();
       beam.pulse.geometry.dispose();
       beam.pulse.material.dispose();
     });
@@ -1209,8 +1253,14 @@
       beam.life -= delta;
       const ratio = Math.max(0, beam.life / beam.maxLife);
       beam.line.material.opacity = ratio * 1.2;
+      beam.markers.forEach(function (marker, index) {
+        marker.material.opacity = ratio * (1 - index * 0.12);
+        marker.scale.setScalar(1 + (1 - ratio) * (1.4 + index * 0.12));
+      });
+      beam.muzzle.material.opacity = ratio * 1.05;
+      beam.muzzle.scale.setScalar(1 + (1 - ratio) * 2.6);
       beam.pulse.material.opacity = ratio * 0.9;
-      beam.pulse.scale.setScalar(1 + (1 - ratio) * 1.8);
+      beam.pulse.scale.setScalar(1 + (1 - ratio) * 2.4);
       if (beam.life <= 0) {
         beamsToRemove.push(beam);
       }
@@ -1222,9 +1272,16 @@
       if (index >= 0) {
         activeBeams.splice(index, 1);
       }
-      scene.remove(beam.line, beam.pulse);
+      scene.remove(beam.line, beam.muzzle, beam.pulse);
+      beam.markers.forEach(function (marker) {
+        scene.remove(marker);
+        marker.geometry.dispose();
+        marker.material.dispose();
+      });
       beam.line.geometry.dispose();
       beam.line.material.dispose();
+      beam.muzzle.geometry.dispose();
+      beam.muzzle.material.dispose();
       beam.pulse.geometry.dispose();
       beam.pulse.material.dispose();
     }
