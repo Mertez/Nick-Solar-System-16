@@ -926,15 +926,13 @@
         !planet.exploded && hitsLeft <= Math.max(1, Math.ceil(planet.maxHp * 0.1)) ? "critical" : ""
       ].filter(Boolean).join(" ");
 
-      const description = planet.exploded
-        ? "Exploded and cleared from the mission."
-        : hitsLeft + " more shots needed to explode.";
+      const value = planet.exploded ? "0" : String(hitsLeft);
 
-      return "<div class=\"" + classes + "\"><strong>" +
+      return "<div class=\"" + classes + "\"><span>" +
         escapeHtml(planet.definition.name) +
-        "</strong><span>" +
-        escapeHtml(description) +
-        "</span></div>";
+        "</span><strong>" +
+        escapeHtml(value) +
+        "</strong></div>";
     }).join("");
   }
 
