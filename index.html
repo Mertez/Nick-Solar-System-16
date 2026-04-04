@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nick Solar System 16</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Fredoka:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="hud sidebar">
+      <div class="brand">
+        <p class="eyebrow">Space Mission</p>
+        <h1>Nick Solar System 16</h1>
+        <p class="tagline">Fly the spaceship, blast the planets, and become the galaxy champion.</p>
+      </div>
+
+      <section class="panel">
+        <h2>Mission Controls</h2>
+        <label class="control">
+          <span>Solar Speed</span>
+          <input id="solarSpeed" type="range" min="0.2" max="2.5" value="1" step="0.1" />
+          <strong id="solarSpeedValue">1.0x</strong>
+        </label>
+        <label class="control">
+          <span>Ship Speed</span>
+          <input id="shipSpeed" type="range" min="0.5" max="4" value="1.5" step="0.1" />
+          <strong id="shipSpeedValue">1.5x</strong>
+        </label>
+        <div class="weapon-switcher">
+          <button class="weapon active" data-weapon="light">Light</button>
+          <button class="weapon" data-weapon="fire">Fire</button>
+        </div>
+        <button id="resetButton" class="primary-button">Reset Mission</button>
+      </section>
+
+      <section class="panel small-panel">
+        <h2>How To Play</h2>
+        <ul>
+          <li><kbd>W A S D</kbd> move like a spaceship pilot</li>
+          <li><kbd>Arrow Keys</kbd> or mouse to look around</li>
+          <li><kbd>Space</kbd> shoot your current weapon</li>
+          <li><kbd>F</kbd> fire blaster, <kbd>L</kbd> light blaster</li>
+          <li>Planets turn red when they are almost defeated</li>
+        </ul>
+      </section>
+    </aside>
+
+    <main class="viewport-wrap">
+      <div id="gameViewport" aria-label="Nick Solar System 16 game scene"></div>
+      <div class="top-strip hud">
+        <div class="stats">
+          <div class="stat"><span>Score</span><strong id="scoreValue">0</strong></div>
+          <div class="stat"><span>Hits</span><strong id="hitsValue">0</strong></div>
+          <div class="stat"><span>Streak</span><strong id="streakValue">0</strong></div>
+          <div class="stat"><span>Explosions</span><strong id="explosionValue">0 / 8</strong></div>
+        </div>
+        <div id="statusBadge" class="status-badge">Pick a target and fire!</div>
+      </div>
+
+      <div class="cockpit-frame">
+        <div class="crosshair">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="reticle-label">Windshield Aim</div>
+      </div>
+
+      <div id="celebrationOverlay" class="celebration-overlay" aria-hidden="true">
+        <div id="ribbonLayer" class="ribbon-layer"></div>
+        <div class="victory-card">
+          <div class="trophy-cup" aria-hidden="true">
+            <div class="trophy-handle left"></div>
+            <div class="trophy-bowl"></div>
+            <div class="trophy-handle right"></div>
+            <div class="trophy-stem"></div>
+            <div class="trophy-base"></div>
+          </div>
+          <h2 id="victoryTitle">Mission Complete!</h2>
+          <p id="victorySubtitle">The galaxy is cheering. Save your score to the leaderboard.</p>
+        </div>
+      </div>
+    </main>
+
+    <aside class="hud leaderboard">
+      <section class="panel">
+        <h2>Galaxy Leaderboard</h2>
+        <form id="leaderboardForm" class="leaderboard-form">
+          <input id="playerName" type="text" maxlength="14" placeholder="Pilot name" value="Nick" disabled />
+          <button id="saveScoreButton" type="submit" class="primary-button" disabled>Save Score</button>
+        </form>
+        <ol id="leaderboardList" class="leaderboard-list"></ol>
+      </section>
+
+      <section class="panel small-panel">
+        <h2>Mission Notes</h2>
+        <p id="missionMessage">Shoot all 8 planets. Big planets need many more hits than the small ones.</p>
+      </section>
+    </aside>
+  </div>
+
+  <script src="./three.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
