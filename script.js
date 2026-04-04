@@ -32,6 +32,8 @@
   const tempVector = new THREE.Vector3();
   const rightVector = new THREE.Vector3();
   const shotDirection = new THREE.Vector3();
+  const asteroidTailDirection = new THREE.Vector3();
+  const asteroidTailUp = new THREE.Vector3(0, 1, 0);
   const particlesToRemove = [];
   const beamsToRemove = [];
   const activeExplosions = [];
@@ -432,8 +434,9 @@
 
   function createAsteroids(count) {
     for (let i = 0; i < count; i += 1) {
+      const size = 0.55 + Math.random() * 0.95;
       const mesh = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.55 + Math.random() * 0.95, 0),
+        new THREE.IcosahedronGeometry(size, 0),
         new THREE.MeshStandardMaterial({
           color: 0x9f8f82,
           emissive: 0x271d18,
@@ -443,8 +446,36 @@
           flatShading: true,
         })
       );
+
+      const tailLength = 3.8 + size * 2.8 + Math.random() * 1.8;
+      const tail = new THREE.Mesh(
+        new THREE.ConeGeometry(size * 0.42, tailLength, 14, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xc9ecff,
+          transparent: true,
+          opacity: 0.42,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+
+      const glow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeRadialTexture(["rgba(255,255,255,0.96)", "rgba(183,230,255,0.65)", "rgba(120,190,255,0.02)"]),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      glow.scale.set(size * 2.8, size * 2.8, 1);
+
       const asteroid = {
         mesh: mesh,
+        tail: tail,
+        glow: glow,
+        size: size,
+        tailLength: tailLength,
         velocity: new THREE.Vector3(),
         rotationSpeed: new THREE.Vector3(),
         active: true,
@@ -454,6 +485,8 @@
       activeAsteroids.push(asteroid);
       asteroidMeshes.push(mesh);
       scene.add(mesh);
+      scene.add(tail);
+      scene.add(glow);
       respawnAsteroid(asteroid, true);
     }
   }
@@ -482,12 +515,18 @@
     );
     asteroid.active = true;
     asteroid.mesh.visible = true;
+    asteroid.tail.visible = true;
+    asteroid.glow.visible = true;
+    asteroid.tail.scale.setScalar(0.85 + Math.random() * 0.45);
     asteroid.respawnAt = immediate ? 0 : performance.now() + 1800 + Math.random() * 2400;
+    updateAsteroidTail(asteroid);
   }
 
   function burstAsteroid(asteroid, point) {
     asteroid.active = false;
     asteroid.mesh.visible = false;
+    asteroid.tail.visible = false;
+    asteroid.glow.visible = false;
     asteroid.respawnAt = performance.now() + 2200 + Math.random() * 2600;
     state.asteroidsDestroyed += 1;
     state.fireRateBoostLevel += 1;
@@ -496,6 +535,16 @@
     createExplosionBurst(point || asteroid.mesh.position, "#ffd18f");
     missionMessage.textContent = "Asteroid smashed. Fire speed boosted!";
     refreshHud();
+  }
+
+  function updateAsteroidTail(asteroid) {
+    asteroidTailDirection.copy(asteroid.velocity).normalize().multiplyScalar(-1);
+    asteroid.tail.position.copy(asteroid.mesh.position).addScaledVector(asteroidTailDirection, asteroid.tailLength * 0.42);
+    asteroid.tail.quaternion.setFromUnitVectors(asteroidTailUp, asteroidTailDirection);
+    asteroid.tail.material.opacity = 0.28 + state.solarSpeed * 0.08;
+
+    asteroid.glow.position.copy(asteroid.mesh.position);
+    asteroid.glow.material.opacity = 0.68;
   }
 
   function updatePlanetVisual(planet, delta) {
@@ -1241,6 +1290,7 @@
       asteroid.mesh.rotation.x += asteroid.rotationSpeed.x * delta;
       asteroid.mesh.rotation.y += asteroid.rotationSpeed.y * delta;
       asteroid.mesh.rotation.z += asteroid.rotationSpeed.z * delta;
+      updateAsteroidTail(asteroid);
 
       if (asteroid.mesh.position.length() > 95 || Math.abs(asteroid.mesh.position.y) > 34) {
         respawnAsteroid(asteroid, true);
