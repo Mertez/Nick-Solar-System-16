@@ -12,6 +12,8 @@
   const explosionValue = document.getElementById("explosionValue");
   const statusBadge = document.getElementById("statusBadge");
   const missionMessage = document.getElementById("missionMessage");
+  const reportStats = document.getElementById("reportStats");
+  const planetReport = document.getElementById("planetReport");
   const leaderboardForm = document.getElementById("leaderboardForm");
   const leaderboardList = document.getElementById("leaderboardList");
   const playerNameInput = document.getElementById("playerName");
@@ -36,6 +38,8 @@
   const activeBeams = [];
   const activePlanets = [];
   const planetMeshes = [];
+  const activeAsteroids = [];
+  const asteroidMeshes = [];
 
   const state = {
     solarSpeed: parseFloat(solarSpeedInput.value),
@@ -45,6 +49,9 @@
     hits: 0,
     streak: 0,
     explosions: 0,
+    asteroidsDestroyed: 0,
+    shotsFired: 0,
+    fireRateBoostLevel: 0,
     gameOver: false,
     pointerLocked: false,
     hoveredPlanet: null,
@@ -275,9 +282,11 @@
 
   planetDefinitions.forEach(createPlanet);
   createStars();
+  createAsteroids(12);
   renderLeaderboard();
   refreshHud();
   updateLeaderboardAccess();
+  updateMissionReport();
 
   function createPlanet(definition) {
     createOrbit(definition.orbitRadius);
@@ -421,6 +430,74 @@
     starGroup.add(stars, nebula);
   }
 
+  function createAsteroids(count) {
+    for (let i = 0; i < count; i += 1) {
+      const mesh = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.55 + Math.random() * 0.95, 0),
+        new THREE.MeshStandardMaterial({
+          color: 0x9f8f82,
+          emissive: 0x271d18,
+          emissiveIntensity: 0.22,
+          roughness: 0.98,
+          metalness: 0.04,
+          flatShading: true,
+        })
+      );
+      const asteroid = {
+        mesh: mesh,
+        velocity: new THREE.Vector3(),
+        rotationSpeed: new THREE.Vector3(),
+        active: true,
+        respawnAt: 0,
+      };
+      mesh.userData.asteroid = asteroid;
+      activeAsteroids.push(asteroid);
+      asteroidMeshes.push(mesh);
+      scene.add(mesh);
+      respawnAsteroid(asteroid, true);
+    }
+  }
+
+  function respawnAsteroid(asteroid, immediate) {
+    const radius = 42 + Math.random() * 42;
+    const angle = Math.random() * Math.PI * 2;
+    const height = -16 + Math.random() * 34;
+    asteroid.mesh.position.set(
+      Math.cos(angle) * radius,
+      height,
+      Math.sin(angle) * radius
+    );
+
+    const driftTarget = new THREE.Vector3(
+      (Math.random() * 2 - 1) * 18,
+      -6 + Math.random() * 18,
+      (Math.random() * 2 - 1) * 18
+    );
+
+    asteroid.velocity.copy(driftTarget.sub(asteroid.mesh.position).normalize().multiplyScalar(3.2 + Math.random() * 3.8));
+    asteroid.rotationSpeed.set(
+      (Math.random() * 2 - 1) * 1.6,
+      (Math.random() * 2 - 1) * 1.6,
+      (Math.random() * 2 - 1) * 1.6
+    );
+    asteroid.active = true;
+    asteroid.mesh.visible = true;
+    asteroid.respawnAt = immediate ? 0 : performance.now() + 1800 + Math.random() * 2400;
+  }
+
+  function burstAsteroid(asteroid, point) {
+    asteroid.active = false;
+    asteroid.mesh.visible = false;
+    asteroid.respawnAt = performance.now() + 2200 + Math.random() * 2600;
+    state.asteroidsDestroyed += 1;
+    state.fireRateBoostLevel += 1;
+    state.score += 35 + Math.min(80, state.fireRateBoostLevel * 3);
+    state.streak += 1;
+    createExplosionBurst(point || asteroid.mesh.position, "#ffd18f");
+    missionMessage.textContent = "Asteroid smashed. Fire speed boosted!";
+    refreshHud();
+  }
+
   function updatePlanetVisual(planet, delta) {
     const hpRatio = planet.currentHp / planet.maxHp;
     const critical = hpRatio <= 0.1 ? 1 : 0;
@@ -441,13 +518,26 @@
     }
   }
 
-  function updateTargeting() {
+  function getCurrentCooldown() {
+    const baseCooldown = state.weapon === "light" ? 170 : 310;
+    const boostFactor = Math.max(0.38, 1 - state.fireRateBoostLevel * 0.045);
+    return Math.max(65, baseCooldown * boostFactor);
+  }
+
+  function getShootableHit() {
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.intersectObjects(planetMeshes, false);
-    const hit = intersects.find(function (item) {
-      return item.object.userData.planet && !item.object.userData.planet.exploded;
-    });
-    const nextPlanet = hit ? hit.object.userData.planet : null;
+    const intersects = raycaster.intersectObjects(planetMeshes.concat(asteroidMeshes), false);
+    return intersects.find(function (item) {
+      const planet = item.object.userData.planet;
+      const asteroid = item.object.userData.asteroid;
+      return (planet && !planet.exploded) || (asteroid && asteroid.active);
+    }) || null;
+  }
+
+  function updateTargeting() {
+    const hit = getShootableHit();
+    const nextPlanet = hit && hit.object.userData.planet ? hit.object.userData.planet : null;
+    const nextAsteroid = hit && hit.object.userData.asteroid ? hit.object.userData.asteroid : null;
     state.hoveredPlanet = nextPlanet && !nextPlanet.exploded ? nextPlanet : null;
 
     if (state.gameOver) {
@@ -462,6 +552,11 @@
       return;
     }
 
+    if (nextAsteroid && nextAsteroid.active) {
+      statusBadge.textContent = "Target asteroid: 1 hit to smash. Bonus fire speed if you land it!";
+      return;
+    }
+
     const left = Math.max(0, Math.ceil(state.hoveredPlanet.currentHp));
     const hpText = left === 1 ? "1 hit left" : left + " hits left";
     const danger = state.hoveredPlanet.currentHp / state.hoveredPlanet.maxHp <= 0.1 ? " Hurry, it is glowing red!" : "";
@@ -473,28 +568,31 @@
       return;
     }
     const now = performance.now();
-    const cooldown = state.weapon === "light" ? 170 : 310;
+    const cooldown = getCurrentCooldown();
     if (now - state.lastShotAt < cooldown) {
       return;
     }
     state.lastShotAt = now;
+    state.shotsFired += 1;
 
     ensureAudio();
     playShotSound(state.weapon);
 
     camera.getWorldDirection(shotDirection);
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.intersectObjects(planetMeshes, false);
-    const hitTarget = intersects.find(function (item) {
-      return item.object.userData.planet && !item.object.userData.planet.exploded;
-    });
-    const target = hitTarget ? hitTarget.object.userData.planet : null;
+    const hitTarget = getShootableHit();
+    const target = hitTarget && hitTarget.object.userData.planet ? hitTarget.object.userData.planet : null;
+    const asteroid = hitTarget && hitTarget.object.userData.asteroid ? hitTarget.object.userData.asteroid : null;
 
     const shotOrigin = camera.position.clone().add(shotDirection.clone().multiplyScalar(2.2));
     let endPoint = shotOrigin.clone().add(shotDirection.clone().multiplyScalar(90));
     let didHit = false;
 
-    if (target && !target.exploded) {
+    if (asteroid && asteroid.active) {
+      endPoint = hitTarget.point.clone();
+      didHit = true;
+      state.hits += 1;
+      burstAsteroid(asteroid, endPoint);
+    } else if (target && !target.exploded) {
       endPoint = hitTarget.point.clone();
       didHit = true;
       target.currentHp = Math.max(0, target.currentHp - 1);
@@ -802,6 +900,42 @@
     hitsValue.textContent = String(state.hits);
     streakValue.textContent = String(state.streak);
     explosionValue.textContent = state.explosions + " / " + activePlanets.length;
+    updateMissionReport();
+  }
+
+  function updateMissionReport() {
+    const cooldown = getCurrentCooldown();
+    const fireBoost = Math.round((1 - cooldown / (state.weapon === "light" ? 170 : 310)) * 100);
+    const liveAsteroids = activeAsteroids.filter(function (asteroid) {
+      return asteroid.active;
+    }).length;
+
+    reportStats.innerHTML =
+      "<div class=\"report-card\"><span>Current weapon</span><strong>" + escapeHtml(state.weapon.toUpperCase()) + "</strong></div>" +
+      "<div class=\"report-card\"><span>Shots fired</span><strong>" + state.shotsFired + "</strong></div>" +
+      "<div class=\"report-card\"><span>Asteroids smashed</span><strong>" + state.asteroidsDestroyed + "</strong></div>" +
+      "<div class=\"report-card\"><span>Fire speed boost</span><strong>" + fireBoost + "%</strong></div>" +
+      "<div class=\"report-card\"><span>Current cooldown</span><strong>" + Math.round(cooldown) + "ms</strong></div>" +
+      "<div class=\"report-card\"><span>Asteroids in space</span><strong>" + liveAsteroids + "</strong></div>";
+
+    planetReport.innerHTML = activePlanets.map(function (planet) {
+      const hitsLeft = Math.max(0, Math.ceil(planet.currentHp));
+      const classes = [
+        "planet-item",
+        planet.exploded ? "done" : "",
+        !planet.exploded && hitsLeft <= Math.max(1, Math.ceil(planet.maxHp * 0.1)) ? "critical" : ""
+      ].filter(Boolean).join(" ");
+
+      const description = planet.exploded
+        ? "Exploded and cleared from the mission."
+        : hitsLeft + " more shots needed to explode.";
+
+      return "<div class=\"" + classes + "\"><strong>" +
+        escapeHtml(planet.definition.name) +
+        "</strong><span>" +
+        escapeHtml(description) +
+        "</span></div>";
+    }).join("");
   }
 
   function getRatingValue() {
@@ -892,6 +1026,9 @@
     state.hits = 0;
     state.streak = 0;
     state.explosions = 0;
+    state.asteroidsDestroyed = 0;
+    state.shotsFired = 0;
+    state.fireRateBoostLevel = 0;
     state.gameOver = false;
     state.lastShotAt = 0;
     state.missionStart = performance.now();
@@ -916,6 +1053,10 @@
         planet.ring.visible = true;
       }
       updatePlanetVisual(planet, 0);
+    });
+
+    activeAsteroids.forEach(function (asteroid) {
+      respawnAsteroid(asteroid, true);
     });
 
     activeExplosions.forEach(function (explosion) {
@@ -945,6 +1086,7 @@
     missionMessage.textContent = weapon === "light"
       ? "Light blaster ready. It is quick and sparkly."
       : "Fire blaster ready. Bigger blast, warmer sound.";
+    updateMissionReport();
   }
 
   function updateLeaderboardAccess() {
@@ -1021,6 +1163,7 @@
     applyControls(delta);
     updateTargeting();
     animateSystem(delta);
+    animateAsteroids(delta);
     animateBeams(delta);
     animateExplosions(delta);
 
@@ -1039,6 +1182,27 @@
       planet.bodyMesh.rotation.y += delta * planet.definition.spin;
       planet.halo.rotation.y -= delta * 0.4;
       updatePlanetVisual(planet, delta);
+    });
+  }
+
+  function animateAsteroids(delta) {
+    activeAsteroids.forEach(function (asteroid) {
+      if (!asteroid.active) {
+        if (performance.now() >= asteroid.respawnAt && !state.gameOver) {
+          respawnAsteroid(asteroid, true);
+          updateMissionReport();
+        }
+        return;
+      }
+
+      asteroid.mesh.position.addScaledVector(asteroid.velocity, delta * (0.7 + state.solarSpeed * 0.35));
+      asteroid.mesh.rotation.x += asteroid.rotationSpeed.x * delta;
+      asteroid.mesh.rotation.y += asteroid.rotationSpeed.y * delta;
+      asteroid.mesh.rotation.z += asteroid.rotationSpeed.z * delta;
+
+      if (asteroid.mesh.position.length() > 95 || Math.abs(asteroid.mesh.position.y) > 34) {
+        respawnAsteroid(asteroid, true);
+      }
     });
   }
 

@@ -571,6 +571,64 @@ kbd {
   color: var(--muted);
 }
 
+.report-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.report-stats,
+.planet-report {
+  display: grid;
+  gap: 10px;
+}
+
+.report-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(140, 205, 255, 0.12);
+}
+
+.report-card strong {
+  color: #fff7c1;
+}
+
+.report-card span {
+  color: var(--muted);
+}
+
+.planet-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(140, 205, 255, 0.1);
+}
+
+.planet-item strong {
+  color: #ffffff;
+}
+
+.planet-item span {
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.planet-item.critical {
+  border-color: rgba(255, 105, 110, 0.42);
+  background: rgba(255, 93, 99, 0.08);
+}
+
+.planet-item.done {
+  border-color: rgba(126, 255, 143, 0.28);
+  background: rgba(126, 255, 143, 0.08);
+}
+
 @media (max-width: 1200px) {
   body {
     overflow: auto;
