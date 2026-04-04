@@ -29,6 +29,7 @@
   const raycaster = new THREE.Raycaster();
   const mouseLook = { yaw: 0, pitch: 0 };
   const clock = new THREE.Clock();
+  const beamAxis = new THREE.Vector3(0, 1, 0);
   const tempVector = new THREE.Vector3();
   const rightVector = new THREE.Vector3();
   const shotDirection = new THREE.Vector3();
@@ -670,29 +671,46 @@
   function createBeam(origin, target, weapon, hit) {
     const beamColor = weapon === "light" ? 0x7cf5ff : 0xff8f4b;
     const glowColor = weapon === "light" ? 0xa6ffff : 0xffd978;
-    const positions = new Float32Array([
-      origin.x, origin.y, origin.z,
-      target.x, target.y, target.z,
-    ]);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const direction = new THREE.Vector3().subVectors(target, origin);
+    const length = Math.max(direction.length(), 0.001);
+    const midpoint = new THREE.Vector3().addVectors(origin, target).multiplyScalar(0.5);
+    const normalizedDirection = direction.clone().normalize();
+    const beamQuaternion = new THREE.Quaternion().setFromUnitVectors(beamAxis, normalizedDirection);
 
-    const material = new THREE.LineBasicMaterial({
-      color: beamColor,
-      transparent: true,
-      opacity: 1,
-      blending: THREE.AdditiveBlending,
-    });
+    const core = new THREE.Mesh(
+      new THREE.CylinderGeometry(weapon === "light" ? 0.08 : 0.12, weapon === "light" ? 0.08 : 0.12, length, 10, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: beamColor,
+        transparent: true,
+        opacity: 0.96,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    core.position.copy(midpoint);
+    core.quaternion.copy(beamQuaternion);
+    scene.add(core);
 
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
+    const glow = new THREE.Mesh(
+      new THREE.CylinderGeometry(weapon === "light" ? 0.18 : 0.24, weapon === "light" ? 0.18 : 0.24, length, 12, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: glowColor,
+        transparent: true,
+        opacity: 0.34,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    glow.position.copy(midpoint);
+    glow.quaternion.copy(beamQuaternion);
+    scene.add(glow);
 
     const markers = [];
-    const markerCount = 4;
+    const markerCount = 6;
     for (let i = 0; i < markerCount; i += 1) {
       const t = (i + 1) / (markerCount + 1);
       const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(weapon === "light" ? 0.18 : 0.24, 10, 10),
+        new THREE.SphereGeometry(weapon === "light" ? 0.22 : 0.3, 10, 10),
         new THREE.MeshBasicMaterial({
           color: glowColor,
           transparent: true,
@@ -733,9 +751,10 @@
     scene.add(pulse);
 
     activeBeams.push({
-      life: 0.22,
-      maxLife: 0.22,
-      line: line,
+      life: 0.28,
+      maxLife: 0.28,
+      core: core,
+      glow: glow,
       markers: markers,
       muzzle: muzzle,
       pulse: pulse,
@@ -746,6 +765,7 @@
     if (planet.exploded) {
       return;
     }
+    const explosionPoint = at || getPlanetWorldPosition(planet);
     planet.exploded = true;
     planet.bodyMesh.visible = false;
     planet.halo.visible = false;
@@ -757,7 +777,7 @@
     state.explosions += 1;
     missionMessage.textContent = planet.definition.name + " exploded into sparkles!";
     playExplosionSound();
-    createExplosionBurst(at || getPlanetWorldPosition(planet), planet.definition.colors[1]);
+    createPlanetExplosionBurst(explosionPoint, planet);
 
     if (state.explosions === activePlanets.length) {
       state.gameOver = true;
@@ -765,6 +785,7 @@
       const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
       state.score += 250;
       missionMessage.textContent = "Mission complete in " + timeSpent + "s. Rating: " + getRatingText() + ". Save your leaderboard score!";
+      stopAsteroids();
       showVictoryCelebration(timeSpent);
       unlockPointer();
       updateLeaderboardAccess();
@@ -805,8 +826,28 @@
     }
   }
 
-  function createExplosionBurst(position, color) {
-    const count = 72;
+  function createPlanetExplosionBurst(position, planet) {
+    createExplosionBurst(position, planet.definition.colors[1], {
+      count: 180,
+      particleSize: 1.25 + planet.definition.size * 0.18,
+      minSpeed: 9,
+      maxSpeed: 18 + planet.definition.size * 2,
+      life: 1.55,
+      flashScale: planet.definition.size * 2.7,
+      shockwaveScale: planet.definition.size * 3.8,
+    });
+    createExplosionBurst(position, planet.definition.colors[2], {
+      count: 120,
+      particleSize: 0.85 + planet.definition.size * 0.14,
+      minSpeed: 6,
+      maxSpeed: 14 + planet.definition.size,
+      life: 1.2,
+    });
+  }
+
+  function createExplosionBurst(position, color, options) {
+    const settings = options || {};
+    const count = settings.count || 72;
     const positions = new Float32Array(count * 3);
     const velocities = new Float32Array(count * 3);
     const tint = new THREE.Color(color);
@@ -821,7 +862,7 @@
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
         Math.random() * 2 - 1
-      ).normalize().multiplyScalar(6 + Math.random() * 12);
+      ).normalize().multiplyScalar((settings.minSpeed || 6) + Math.random() * ((settings.maxSpeed || 18) - (settings.minSpeed || 6)));
 
       velocities[i * 3] = direction.x;
       velocities[i * 3 + 1] = direction.y;
@@ -833,7 +874,7 @@
       geometry,
       new THREE.PointsMaterial({
         color: tint,
-        size: 0.95,
+        size: settings.particleSize || 0.95,
         transparent: true,
         opacity: 1,
         blending: THREE.AdditiveBlending,
@@ -842,12 +883,47 @@
     );
     scene.add(points);
 
+    let flash = null;
+    if (settings.flashScale) {
+      flash = new THREE.Mesh(
+        new THREE.SphereGeometry(settings.flashScale, 18, 18),
+        new THREE.MeshBasicMaterial({
+          color: tint,
+          transparent: true,
+          opacity: 0.42,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      flash.position.copy(position);
+      scene.add(flash);
+    }
+
+    let shockwave = null;
+    if (settings.shockwaveScale) {
+      shockwave = new THREE.Mesh(
+        new THREE.SphereGeometry(Math.max(0.2, settings.shockwaveScale * 0.18), 18, 18),
+        new THREE.MeshBasicMaterial({
+          color: 0xfff0b8,
+          transparent: true,
+          opacity: 0.35,
+          blending: THREE.AdditiveBlending,
+          wireframe: true,
+          depthWrite: false,
+        })
+      );
+      shockwave.position.copy(position);
+      scene.add(shockwave);
+    }
+
     activeExplosions.push({
       points: points,
       positions: positions,
       velocities: velocities,
-      life: 1.15,
-      maxLife: 1.15,
+      flash: flash,
+      shockwave: shockwave,
+      life: settings.life || 1.15,
+      maxLife: settings.life || 1.15,
     });
   }
 
@@ -1012,7 +1088,7 @@
         !planet.exploded && hitsLeft <= Math.max(1, Math.ceil(planet.maxHp * 0.1)) ? "critical" : ""
       ].filter(Boolean).join(" ");
 
-      const value = planet.exploded ? "0" : String(hitsLeft);
+      const value = (planet.exploded ? "0" : String(hitsLeft)) + "/" + planet.maxHp;
 
       return "<div class=\"" + classes + "\"><span>" +
         escapeHtml(planet.definition.name) +
@@ -1145,20 +1221,32 @@
 
     activeExplosions.forEach(function (explosion) {
       scene.remove(explosion.points);
+      if (explosion.flash) {
+        scene.remove(explosion.flash);
+        explosion.flash.geometry.dispose();
+        explosion.flash.material.dispose();
+      }
+      if (explosion.shockwave) {
+        scene.remove(explosion.shockwave);
+        explosion.shockwave.geometry.dispose();
+        explosion.shockwave.material.dispose();
+      }
       explosion.points.geometry.dispose();
       explosion.points.material.dispose();
     });
     activeExplosions.length = 0;
 
     activeBeams.forEach(function (beam) {
-      scene.remove(beam.line, beam.muzzle, beam.pulse);
+      scene.remove(beam.core, beam.glow, beam.muzzle, beam.pulse);
       beam.markers.forEach(function (marker) {
         scene.remove(marker);
         marker.geometry.dispose();
         marker.material.dispose();
       });
-      beam.line.geometry.dispose();
-      beam.line.material.dispose();
+      beam.core.geometry.dispose();
+      beam.core.material.dispose();
+      beam.glow.geometry.dispose();
+      beam.glow.material.dispose();
       beam.muzzle.geometry.dispose();
       beam.muzzle.material.dispose();
       beam.pulse.geometry.dispose();
@@ -1178,6 +1266,15 @@
       ? "Light blaster ready. It is quick and sparkly."
       : "Fire blaster ready. Bigger blast, warmer sound.";
     updateMissionReport();
+  }
+
+  function stopAsteroids() {
+    activeAsteroids.forEach(function (asteroid) {
+      asteroid.active = false;
+      asteroid.mesh.visible = false;
+      asteroid.tail.visible = false;
+      asteroid.glow.visible = false;
+    });
   }
 
   function updateLeaderboardAccess() {
@@ -1302,7 +1399,10 @@
     activeBeams.forEach(function (beam) {
       beam.life -= delta;
       const ratio = Math.max(0, beam.life / beam.maxLife);
-      beam.line.material.opacity = ratio * 1.2;
+      beam.core.material.opacity = ratio * 1.22;
+      beam.glow.material.opacity = ratio * 0.48;
+      beam.core.scale.set(1 + (1 - ratio) * 0.18, 1, 1 + (1 - ratio) * 0.18);
+      beam.glow.scale.set(1 + (1 - ratio) * 0.42, 1, 1 + (1 - ratio) * 0.42);
       beam.markers.forEach(function (marker, index) {
         marker.material.opacity = ratio * (1 - index * 0.12);
         marker.scale.setScalar(1 + (1 - ratio) * (1.4 + index * 0.12));
@@ -1322,14 +1422,16 @@
       if (index >= 0) {
         activeBeams.splice(index, 1);
       }
-      scene.remove(beam.line, beam.muzzle, beam.pulse);
+      scene.remove(beam.core, beam.glow, beam.muzzle, beam.pulse);
       beam.markers.forEach(function (marker) {
         scene.remove(marker);
         marker.geometry.dispose();
         marker.material.dispose();
       });
-      beam.line.geometry.dispose();
-      beam.line.material.dispose();
+      beam.core.geometry.dispose();
+      beam.core.material.dispose();
+      beam.glow.geometry.dispose();
+      beam.glow.material.dispose();
       beam.muzzle.geometry.dispose();
       beam.muzzle.material.dispose();
       beam.pulse.geometry.dispose();
@@ -1350,6 +1452,14 @@
       explosion.points.geometry.attributes.position.needsUpdate = true;
       explosion.points.material.opacity = ratio;
       explosion.points.material.size = 0.8 + (1 - ratio) * 0.8;
+      if (explosion.flash) {
+        explosion.flash.material.opacity = ratio * 0.42;
+        explosion.flash.scale.setScalar(1 + (1 - ratio) * 2.2);
+      }
+      if (explosion.shockwave) {
+        explosion.shockwave.material.opacity = ratio * 0.32;
+        explosion.shockwave.scale.setScalar(1 + (1 - ratio) * 6.5);
+      }
 
       if (explosion.life <= 0) {
         particlesToRemove.push(explosion);
@@ -1363,6 +1473,16 @@
         activeExplosions.splice(index, 1);
       }
       scene.remove(explosion.points);
+      if (explosion.flash) {
+        scene.remove(explosion.flash);
+        explosion.flash.geometry.dispose();
+        explosion.flash.material.dispose();
+      }
+      if (explosion.shockwave) {
+        scene.remove(explosion.shockwave);
+        explosion.shockwave.geometry.dispose();
+        explosion.shockwave.material.dispose();
+      }
       explosion.points.geometry.dispose();
       explosion.points.material.dispose();
     }
