@@ -12,8 +12,6 @@
   const explosionValue = document.getElementById("explosionValue");
   const statusBadge = document.getElementById("statusBadge");
   const missionMessage = document.getElementById("missionMessage");
-  const reportStats = document.getElementById("reportStats");
-  const planetReport = document.getElementById("planetReport");
   const leaderboardForm = document.getElementById("leaderboardForm");
   const leaderboardList = document.getElementById("leaderboardList");
   const playerNameInput = document.getElementById("playerName");
@@ -29,20 +27,15 @@
   const raycaster = new THREE.Raycaster();
   const mouseLook = { yaw: 0, pitch: 0 };
   const clock = new THREE.Clock();
-  const beamAxis = new THREE.Vector3(0, 1, 0);
   const tempVector = new THREE.Vector3();
   const rightVector = new THREE.Vector3();
   const shotDirection = new THREE.Vector3();
-  const asteroidTailDirection = new THREE.Vector3();
-  const asteroidTailUp = new THREE.Vector3(0, 1, 0);
   const particlesToRemove = [];
   const beamsToRemove = [];
   const activeExplosions = [];
   const activeBeams = [];
   const activePlanets = [];
   const planetMeshes = [];
-  const activeAsteroids = [];
-  const asteroidMeshes = [];
 
   const state = {
     solarSpeed: parseFloat(solarSpeedInput.value),
@@ -52,9 +45,6 @@
     hits: 0,
     streak: 0,
     explosions: 0,
-    asteroidsDestroyed: 0,
-    shotsFired: 0,
-    fireRateBoostLevel: 0,
     gameOver: false,
     pointerLocked: false,
     hoveredPlanet: null,
@@ -142,19 +132,7 @@
 
     sunGroup.add(sun, corona, glow);
     solarSystemRoot.add(sunGroup);
-    const sunState = {
-      maxHp: 20,
-      currentHp: 20,
-      unlocked: false,
-      exploded: false,
-      baseColor: new THREE.Color(0xffc655),
-      criticalColor: new THREE.Color(0xff5147),
-      baseEmissive: new THREE.Color(0xff8c1a),
-      criticalEmissive: new THREE.Color(0xff341f),
-      flash: 0,
-    };
-    sun.userData.sunState = sunState;
-    return { sunGroup, sun, glow, corona, state: sunState };
+    return { sunGroup, sun, glow, corona };
   }
 
   const sunParts = createSun();
@@ -285,23 +263,21 @@
   }
 
   const planetDefinitions = [
-    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 1, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
-    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 2, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
-    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 2, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
-    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 1, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
-    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 3, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
-    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 2, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
-    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 2, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
-    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 2, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
+    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 10, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
+    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 12, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
+    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 12, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
+    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 10, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
+    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 30, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
+    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 28, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
+    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 24, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
+    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 24, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
   ];
 
   planetDefinitions.forEach(createPlanet);
   createStars();
-  createAsteroids(12);
   renderLeaderboard();
   refreshHud();
   updateLeaderboardAccess();
-  updateMissionReport();
 
   function createPlanet(definition) {
     createOrbit(definition.orbitRadius);
@@ -445,121 +421,6 @@
     starGroup.add(stars, nebula);
   }
 
-  function createAsteroids(count) {
-    for (let i = 0; i < count; i += 1) {
-      const size = 0.55 + Math.random() * 0.95;
-      const mesh = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(size, 0),
-        new THREE.MeshStandardMaterial({
-          color: 0x9f8f82,
-          emissive: 0x271d18,
-          emissiveIntensity: 0.22,
-          roughness: 0.98,
-          metalness: 0.04,
-          flatShading: true,
-        })
-      );
-
-      const tailLength = 3.8 + size * 2.8 + Math.random() * 1.8;
-      const tail = new THREE.Mesh(
-        new THREE.ConeGeometry(size * 0.42, tailLength, 14, 1, true),
-        new THREE.MeshBasicMaterial({
-          color: 0xc9ecff,
-          transparent: true,
-          opacity: 0.42,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        })
-      );
-
-      const glow = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: makeRadialTexture(["rgba(255,255,255,0.96)", "rgba(183,230,255,0.65)", "rgba(120,190,255,0.02)"]),
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        })
-      );
-      glow.scale.set(size * 2.8, size * 2.8, 1);
-
-      const asteroid = {
-        mesh: mesh,
-        tail: tail,
-        glow: glow,
-        size: size,
-        tailLength: tailLength,
-        velocity: new THREE.Vector3(),
-        rotationSpeed: new THREE.Vector3(),
-        active: true,
-        respawnAt: 0,
-      };
-      mesh.userData.asteroid = asteroid;
-      activeAsteroids.push(asteroid);
-      asteroidMeshes.push(mesh);
-      scene.add(mesh);
-      scene.add(tail);
-      scene.add(glow);
-      respawnAsteroid(asteroid, true);
-    }
-  }
-
-  function respawnAsteroid(asteroid, immediate) {
-    const radius = 42 + Math.random() * 42;
-    const angle = Math.random() * Math.PI * 2;
-    const height = -16 + Math.random() * 34;
-    asteroid.mesh.position.set(
-      Math.cos(angle) * radius,
-      height,
-      Math.sin(angle) * radius
-    );
-
-    const driftTarget = new THREE.Vector3(
-      (Math.random() * 2 - 1) * 18,
-      -6 + Math.random() * 18,
-      (Math.random() * 2 - 1) * 18
-    );
-
-    asteroid.velocity.copy(driftTarget.sub(asteroid.mesh.position).normalize().multiplyScalar(3.2 + Math.random() * 3.8));
-    asteroid.rotationSpeed.set(
-      (Math.random() * 2 - 1) * 1.6,
-      (Math.random() * 2 - 1) * 1.6,
-      (Math.random() * 2 - 1) * 1.6
-    );
-    asteroid.active = true;
-    asteroid.mesh.visible = true;
-    asteroid.tail.visible = true;
-    asteroid.glow.visible = true;
-    asteroid.tail.scale.setScalar(0.85 + Math.random() * 0.45);
-    asteroid.respawnAt = immediate ? 0 : performance.now() + 1800 + Math.random() * 2400;
-    updateAsteroidTail(asteroid);
-  }
-
-  function burstAsteroid(asteroid, point) {
-    asteroid.active = false;
-    asteroid.mesh.visible = false;
-    asteroid.tail.visible = false;
-    asteroid.glow.visible = false;
-    asteroid.respawnAt = performance.now() + 2200 + Math.random() * 2600;
-    state.asteroidsDestroyed += 1;
-    state.fireRateBoostLevel += 1;
-    state.score += 35 + Math.min(80, state.fireRateBoostLevel * 3);
-    state.streak += 1;
-    createExplosionBurst(point || asteroid.mesh.position, "#ffd18f");
-    missionMessage.textContent = "Asteroid smashed. Fire speed boosted!";
-    refreshHud();
-  }
-
-  function updateAsteroidTail(asteroid) {
-    asteroidTailDirection.copy(asteroid.velocity).normalize().multiplyScalar(-1);
-    asteroid.tail.position.copy(asteroid.mesh.position).addScaledVector(asteroidTailDirection, asteroid.tailLength * 0.42);
-    asteroid.tail.quaternion.setFromUnitVectors(asteroidTailUp, asteroidTailDirection);
-    asteroid.tail.material.opacity = 0.28 + state.solarSpeed * 0.08;
-
-    asteroid.glow.position.copy(asteroid.mesh.position);
-    asteroid.glow.material.opacity = 0.68;
-  }
-
   function updatePlanetVisual(planet, delta) {
     const hpRatio = planet.currentHp / planet.maxHp;
     const critical = hpRatio <= 0.1 ? 1 : 0;
@@ -580,32 +441,13 @@
     }
   }
 
-  function getCurrentCooldown() {
-    const baseCooldown = state.weapon === "light" ? 170 : 310;
-    const boostFactor = Math.max(0.38, 1 - state.fireRateBoostLevel * 0.045);
-    return Math.max(65, baseCooldown * boostFactor);
-  }
-
-  function getShootableHit() {
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const hitMeshes = planetMeshes.concat(asteroidMeshes);
-    if (sunParts.state.unlocked && !sunParts.state.exploded) {
-      hitMeshes.push(sunParts.sun);
-    }
-    const intersects = raycaster.intersectObjects(hitMeshes, false);
-    return intersects.find(function (item) {
-      const planet = item.object.userData.planet;
-      const asteroid = item.object.userData.asteroid;
-      const sunState = item.object.userData.sunState;
-      return (planet && !planet.exploded) || (asteroid && asteroid.active) || (sunState && sunState.unlocked && !sunState.exploded);
-    }) || null;
-  }
-
   function updateTargeting() {
-    const hit = getShootableHit();
-    const nextPlanet = hit && hit.object.userData.planet ? hit.object.userData.planet : null;
-    const nextAsteroid = hit && hit.object.userData.asteroid ? hit.object.userData.asteroid : null;
-    const nextSun = hit && hit.object.userData.sunState ? hit.object.userData.sunState : null;
+    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    const intersects = raycaster.intersectObjects(planetMeshes, false);
+    const hit = intersects.find(function (item) {
+      return item.object.userData.planet && !item.object.userData.planet.exploded;
+    });
+    const nextPlanet = hit ? hit.object.userData.planet : null;
     state.hoveredPlanet = nextPlanet && !nextPlanet.exploded ? nextPlanet : null;
 
     if (state.gameOver) {
@@ -620,16 +462,6 @@
       return;
     }
 
-    if (nextAsteroid && nextAsteroid.active) {
-      statusBadge.textContent = "Target asteroid: 1 hit to smash. Bonus fire speed if you land it!";
-      return;
-    }
-
-    if (nextSun && nextSun.unlocked && !nextSun.exploded) {
-      statusBadge.textContent = "Final target Sun: " + Math.max(0, Math.ceil(nextSun.currentHp)) + " hits left. Finish the mission!";
-      return;
-    }
-
     const left = Math.max(0, Math.ceil(state.hoveredPlanet.currentHp));
     const hpText = left === 1 ? "1 hit left" : left + " hits left";
     const danger = state.hoveredPlanet.currentHp / state.hoveredPlanet.maxHp <= 0.1 ? " Hurry, it is glowing red!" : "";
@@ -641,49 +473,28 @@
       return;
     }
     const now = performance.now();
-    const cooldown = getCurrentCooldown();
+    const cooldown = state.weapon === "light" ? 170 : 310;
     if (now - state.lastShotAt < cooldown) {
       return;
     }
     state.lastShotAt = now;
-    state.shotsFired += 1;
 
     ensureAudio();
     playShotSound(state.weapon);
 
     camera.getWorldDirection(shotDirection);
-    const hitTarget = getShootableHit();
-    const target = hitTarget && hitTarget.object.userData.planet ? hitTarget.object.userData.planet : null;
-    const asteroid = hitTarget && hitTarget.object.userData.asteroid ? hitTarget.object.userData.asteroid : null;
-    const sunTarget = hitTarget && hitTarget.object.userData.sunState ? hitTarget.object.userData.sunState : null;
+    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    const intersects = raycaster.intersectObjects(planetMeshes, false);
+    const hitTarget = intersects.find(function (item) {
+      return item.object.userData.planet && !item.object.userData.planet.exploded;
+    });
+    const target = hitTarget ? hitTarget.object.userData.planet : null;
 
     const shotOrigin = camera.position.clone().add(shotDirection.clone().multiplyScalar(2.2));
     let endPoint = shotOrigin.clone().add(shotDirection.clone().multiplyScalar(90));
     let didHit = false;
 
-    if (asteroid && asteroid.active) {
-      endPoint = hitTarget.point.clone();
-      didHit = true;
-      state.hits += 1;
-      burstAsteroid(asteroid, endPoint);
-    } else if (sunTarget && sunTarget.unlocked && !sunTarget.exploded) {
-      endPoint = hitTarget.point.clone();
-      didHit = true;
-      sunTarget.currentHp = Math.max(0, sunTarget.currentHp - 1);
-      sunTarget.flash = 1;
-      state.hits += 1;
-      state.streak += 1;
-      state.score += state.weapon === "light" ? 18 : 24;
-
-      if (sunTarget.currentHp === 0) {
-        explodeSun(endPoint);
-        state.score += sunTarget.maxHp * 22;
-      } else if (sunTarget.currentHp / sunTarget.maxHp <= 0.1) {
-        missionMessage.textContent = "The Sun is turning red-hot. Keep firing!";
-      } else {
-        missionMessage.textContent = "The Sun was hit. " + Math.ceil(sunTarget.currentHp) + " hits to go.";
-      }
-    } else if (target && !target.exploded) {
+    if (target && !target.exploded) {
       endPoint = hitTarget.point.clone();
       didHit = true;
       target.currentHp = Math.max(0, target.currentHp - 1);
@@ -710,94 +521,39 @@
   }
 
   function createBeam(origin, target, weapon, hit) {
-    const beamColor = weapon === "light" ? 0x7cf5ff : 0xff8f4b;
-    const glowColor = weapon === "light" ? 0xa6ffff : 0xffd978;
-    const direction = new THREE.Vector3().subVectors(target, origin);
-    const length = Math.max(direction.length(), 0.001);
-    const midpoint = new THREE.Vector3().addVectors(origin, target).multiplyScalar(0.5);
-    const normalizedDirection = direction.clone().normalize();
-    const beamQuaternion = new THREE.Quaternion().setFromUnitVectors(beamAxis, normalizedDirection);
+    const positions = new Float32Array([
+      origin.x, origin.y, origin.z,
+      target.x, target.y, target.z,
+    ]);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
-    const core = new THREE.Mesh(
-      new THREE.CylinderGeometry(weapon === "light" ? 0.08 : 0.12, weapon === "light" ? 0.08 : 0.12, length, 10, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: beamColor,
-        transparent: true,
-        opacity: 0.96,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    core.position.copy(midpoint);
-    core.quaternion.copy(beamQuaternion);
-    scene.add(core);
+    const material = new THREE.LineBasicMaterial({
+      color: weapon === "light" ? 0x7cf5ff : 0xff8f4b,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+    });
 
-    const glow = new THREE.Mesh(
-      new THREE.CylinderGeometry(weapon === "light" ? 0.18 : 0.24, weapon === "light" ? 0.18 : 0.24, length, 12, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: glowColor,
-        transparent: true,
-        opacity: 0.34,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    glow.position.copy(midpoint);
-    glow.quaternion.copy(beamQuaternion);
-    scene.add(glow);
-
-    const markers = [];
-    const markerCount = 6;
-    for (let i = 0; i < markerCount; i += 1) {
-      const t = (i + 1) / (markerCount + 1);
-      const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(weapon === "light" ? 0.22 : 0.3, 10, 10),
-        new THREE.MeshBasicMaterial({
-          color: glowColor,
-          transparent: true,
-          opacity: 0.9,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      marker.position.lerpVectors(origin, target, t);
-      scene.add(marker);
-      markers.push(marker);
-    }
-
-    const muzzle = new THREE.Mesh(
-      new THREE.SphereGeometry(weapon === "light" ? 0.34 : 0.46, 12, 12),
-      new THREE.MeshBasicMaterial({
-        color: glowColor,
-        transparent: true,
-        opacity: 0.88,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    muzzle.position.copy(origin);
-    scene.add(muzzle);
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
 
     const pulse = new THREE.Mesh(
-      new THREE.SphereGeometry(hit ? 0.7 : 0.4, 14, 14),
+      new THREE.SphereGeometry(hit ? 0.55 : 0.3, 12, 12),
       new THREE.MeshBasicMaterial({
-        color: glowColor,
+        color: weapon === "light" ? 0xa6ffff : 0xffd978,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.75,
         blending: THREE.AdditiveBlending,
-        depthWrite: false,
       })
     );
     pulse.position.copy(target);
     scene.add(pulse);
 
     activeBeams.push({
-      life: 0.28,
-      maxLife: 0.28,
-      core: core,
-      glow: glow,
-      markers: markers,
-      muzzle: muzzle,
+      life: 0.16,
+      maxLife: 0.16,
+      line: line,
       pulse: pulse,
     });
   }
@@ -806,7 +562,6 @@
     if (planet.exploded) {
       return;
     }
-    const explosionPoint = at || getPlanetWorldPosition(planet);
     planet.exploded = true;
     planet.bodyMesh.visible = false;
     planet.halo.visible = false;
@@ -818,34 +573,18 @@
     state.explosions += 1;
     missionMessage.textContent = planet.definition.name + " exploded into sparkles!";
     playExplosionSound();
-    createPlanetExplosionBurst(explosionPoint, planet);
+    createExplosionBurst(at || getPlanetWorldPosition(planet), planet.definition.colors[1]);
 
     if (state.explosions === activePlanets.length) {
-      sunParts.state.unlocked = true;
-      missionMessage.textContent = "All 8 planets are gone. Now shoot the Sun 20 times to finish the mission!";
-      refreshHud();
+      state.gameOver = true;
+      state.scoreSaved = false;
+      const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
+      state.score += 250;
+      missionMessage.textContent = "Mission complete in " + timeSpent + "s. Rating: " + getRatingText() + ". Save your leaderboard score!";
+      showVictoryCelebration(timeSpent);
+      unlockPointer();
+      updateLeaderboardAccess();
     }
-  }
-
-  function explodeSun(at) {
-    const explosionPoint = at || new THREE.Vector3(0, 0, 0);
-    sunParts.state.exploded = true;
-    sunParts.sun.visible = false;
-    sunParts.corona.visible = false;
-    sunParts.glow.visible = false;
-
-    playExplosionSound();
-    createSunExplosionBurst(explosionPoint);
-
-    state.gameOver = true;
-    state.scoreSaved = false;
-    const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
-    state.score += 250;
-    missionMessage.textContent = "Sun destroyed in " + timeSpent + "s. Mission complete! Save your leaderboard score.";
-    stopAsteroids();
-    showVictoryCelebration(timeSpent);
-    unlockPointer();
-    updateLeaderboardAccess();
   }
 
   function showVictoryCelebration(timeSpent) {
@@ -882,99 +621,8 @@
     }
   }
 
-  function createPlanetExplosionBurst(position, planet) {
-    const burstShell = new THREE.Mesh(
-      new THREE.SphereGeometry(planet.definition.size * 1.02, 28, 28),
-      new THREE.MeshBasicMaterial({
-        map: planet.bodyMesh.material.map,
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.82,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    burstShell.position.copy(position);
-    burstShell.quaternion.copy(planet.bodyMesh.getWorldQuaternion(new THREE.Quaternion()));
-    scene.add(burstShell);
-
-    createExplosionBurst(position, planet.definition.colors[1], {
-      count: 180,
-      particleSize: 1.25 + planet.definition.size * 0.18,
-      minSpeed: 9,
-      maxSpeed: 18 + planet.definition.size * 2,
-      life: 1.55,
-      flashScale: planet.definition.size * 2.7,
-      shockwaveScale: planet.definition.size * 3.8,
-      burstMesh: burstShell,
-    });
-    createExplosionBurst(position, planet.definition.colors[2], {
-      count: 120,
-      particleSize: 0.85 + planet.definition.size * 0.14,
-      minSpeed: 6,
-      maxSpeed: 14 + planet.definition.size,
-      life: 1.2,
-    });
-  }
-
-  function createSunExplosionBurst(position) {
-    const burstShell = new THREE.Mesh(
-      new THREE.SphereGeometry(5.3, 32, 32),
-      new THREE.MeshBasicMaterial({
-        color: 0xffd66e,
-        transparent: true,
-        opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    burstShell.position.copy(position);
-    scene.add(burstShell);
-
-    createExplosionBurst(position, "#ffd86b", {
-      count: 320,
-      particleSize: 2.1,
-      minSpeed: 12,
-      maxSpeed: 28,
-      life: 1.95,
-      flashScale: 14,
-      shockwaveScale: 22,
-      burstMesh: burstShell,
-    });
-    createExplosionBurst(position, "#ff8c2a", {
-      count: 220,
-      particleSize: 1.35,
-      minSpeed: 8,
-      maxSpeed: 22,
-      life: 1.55,
-      flashScale: 8,
-    });
-  }
-
-  function updateSunVisual(delta) {
-    const sunState = sunParts.state;
-    sunState.flash = Math.max(0, sunState.flash - delta * 2.4);
-
-    if (!sunState.unlocked || sunState.exploded) {
-      sunParts.sun.material.color.copy(sunState.baseColor);
-      sunParts.sun.material.emissive.copy(sunState.baseEmissive);
-      sunParts.sun.material.emissiveIntensity = 1.7;
-      return;
-    }
-
-    const hpRatio = sunState.currentHp / sunState.maxHp;
-    const critical = hpRatio <= 0.1 ? 1 : 0;
-    sunParts.sun.material.color.copy(sunState.baseColor).lerp(sunState.criticalColor, 0.4 + critical * 0.45);
-    sunParts.sun.material.emissive.copy(sunState.baseEmissive).lerp(sunState.criticalEmissive, critical * 0.7);
-    sunParts.sun.material.emissiveIntensity = 1.7 + critical * 0.6 + sunState.flash * 0.9;
-    sunParts.corona.material.opacity = 0.18 + critical * 0.14 + sunState.flash * 0.12;
-    sunParts.glow.material.opacity = 1;
-    sunParts.glow.scale.setScalar(24 + critical * 2.4 + sunState.flash * 3.2);
-  }
-
-  function createExplosionBurst(position, color, options) {
-    const settings = options || {};
-    const count = settings.count || 72;
+  function createExplosionBurst(position, color) {
+    const count = 72;
     const positions = new Float32Array(count * 3);
     const velocities = new Float32Array(count * 3);
     const tint = new THREE.Color(color);
@@ -989,7 +637,7 @@
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
         Math.random() * 2 - 1
-      ).normalize().multiplyScalar((settings.minSpeed || 6) + Math.random() * ((settings.maxSpeed || 18) - (settings.minSpeed || 6)));
+      ).normalize().multiplyScalar(6 + Math.random() * 12);
 
       velocities[i * 3] = direction.x;
       velocities[i * 3 + 1] = direction.y;
@@ -1001,7 +649,7 @@
       geometry,
       new THREE.PointsMaterial({
         color: tint,
-        size: settings.particleSize || 0.95,
+        size: 0.95,
         transparent: true,
         opacity: 1,
         blending: THREE.AdditiveBlending,
@@ -1010,48 +658,12 @@
     );
     scene.add(points);
 
-    let flash = null;
-    if (settings.flashScale) {
-      flash = new THREE.Mesh(
-        new THREE.SphereGeometry(settings.flashScale, 18, 18),
-        new THREE.MeshBasicMaterial({
-          color: tint,
-          transparent: true,
-          opacity: 0.42,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      flash.position.copy(position);
-      scene.add(flash);
-    }
-
-    let shockwave = null;
-    if (settings.shockwaveScale) {
-      shockwave = new THREE.Mesh(
-        new THREE.SphereGeometry(Math.max(0.2, settings.shockwaveScale * 0.18), 18, 18),
-        new THREE.MeshBasicMaterial({
-          color: 0xfff0b8,
-          transparent: true,
-          opacity: 0.35,
-          blending: THREE.AdditiveBlending,
-          wireframe: true,
-          depthWrite: false,
-        })
-      );
-      shockwave.position.copy(position);
-      scene.add(shockwave);
-    }
-
     activeExplosions.push({
       points: points,
       positions: positions,
       velocities: velocities,
-      burstMesh: settings.burstMesh || null,
-      flash: flash,
-      shockwave: shockwave,
-      life: settings.life || 1.15,
-      maxLife: settings.life || 1.15,
+      life: 1.15,
+      maxLife: 1.15,
     });
   }
 
@@ -1189,49 +801,7 @@
     scoreValue.textContent = String(state.score);
     hitsValue.textContent = String(state.hits);
     streakValue.textContent = String(state.streak);
-    explosionValue.textContent = sunParts.state.unlocked && !sunParts.state.exploded
-      ? state.explosions + " / " + activePlanets.length + " + Sun"
-      : state.explosions + " / " + activePlanets.length;
-    updateMissionReport();
-  }
-
-  function updateMissionReport() {
-    const cooldown = getCurrentCooldown();
-    const fireBoost = Math.round((1 - cooldown / (state.weapon === "light" ? 170 : 310)) * 100);
-    const liveAsteroids = activeAsteroids.filter(function (asteroid) {
-      return asteroid.active;
-    }).length;
-
-    reportStats.innerHTML =
-      "<div class=\"report-card\"><span>Current weapon</span><strong>" + escapeHtml(state.weapon.toUpperCase()) + "</strong></div>" +
-      "<div class=\"report-card\"><span>Shots fired</span><strong>" + state.shotsFired + "</strong></div>" +
-      "<div class=\"report-card\"><span>Asteroids smashed</span><strong>" + state.asteroidsDestroyed + "</strong></div>" +
-      "<div class=\"report-card\"><span>Fire speed boost</span><strong>" + fireBoost + "%</strong></div>" +
-      "<div class=\"report-card\"><span>Current cooldown</span><strong>" + Math.round(cooldown) + "ms</strong></div>" +
-      "<div class=\"report-card\"><span>Asteroids in space</span><strong>" + liveAsteroids + "</strong></div>";
-
-    planetReport.innerHTML = activePlanets.map(function (planet) {
-      const hitsLeft = Math.max(0, Math.ceil(planet.currentHp));
-      const classes = [
-        "planet-item",
-        planet.exploded ? "done" : "",
-        !planet.exploded && hitsLeft <= Math.max(1, Math.ceil(planet.maxHp * 0.1)) ? "critical" : ""
-      ].filter(Boolean).join(" ");
-
-      const value = (planet.exploded ? "0" : String(hitsLeft)) + "/" + planet.maxHp;
-
-      return "<div class=\"" + classes + "\"><span>" +
-        escapeHtml(planet.definition.name) +
-        "</span><strong>" +
-        escapeHtml(value) +
-        "</strong></div>";
-    }).join("");
-
-    planetReport.innerHTML += "<div class=\"planet-item " +
-      (sunParts.state.exploded ? "done" : sunParts.state.unlocked ? "critical" : "") +
-      "\"><span>Sun</span><strong>" +
-      escapeHtml(sunParts.state.exploded ? "0/" + sunParts.state.maxHp : sunParts.state.unlocked ? Math.ceil(sunParts.state.currentHp) + "/" + sunParts.state.maxHp : "LOCKED") +
-      "</strong></div>";
+    explosionValue.textContent = state.explosions + " / " + activePlanets.length;
   }
 
   function getRatingValue() {
@@ -1322,9 +892,6 @@
     state.hits = 0;
     state.streak = 0;
     state.explosions = 0;
-    state.asteroidsDestroyed = 0;
-    state.shotsFired = 0;
-    state.fireRateBoostLevel = 0;
     state.gameOver = false;
     state.lastShotAt = 0;
     state.missionStart = performance.now();
@@ -1336,14 +903,6 @@
     mouseLook.pitch = -0.12;
     hideVictoryCelebration();
     updateLeaderboardAccess();
-    sunParts.state.currentHp = sunParts.state.maxHp;
-    sunParts.state.unlocked = false;
-    sunParts.state.exploded = false;
-    sunParts.state.flash = 0;
-    sunParts.sun.visible = true;
-    sunParts.corona.visible = true;
-    sunParts.glow.visible = true;
-    updateSunVisual(0);
 
     activePlanets.forEach(function (planet) {
       planet.currentHp = planet.maxHp;
@@ -1359,45 +918,17 @@
       updatePlanetVisual(planet, 0);
     });
 
-    activeAsteroids.forEach(function (asteroid) {
-      respawnAsteroid(asteroid, true);
-    });
-
     activeExplosions.forEach(function (explosion) {
       scene.remove(explosion.points);
-      if (explosion.burstMesh) {
-        scene.remove(explosion.burstMesh);
-        explosion.burstMesh.geometry.dispose();
-        explosion.burstMesh.material.dispose();
-      }
-      if (explosion.flash) {
-        scene.remove(explosion.flash);
-        explosion.flash.geometry.dispose();
-        explosion.flash.material.dispose();
-      }
-      if (explosion.shockwave) {
-        scene.remove(explosion.shockwave);
-        explosion.shockwave.geometry.dispose();
-        explosion.shockwave.material.dispose();
-      }
       explosion.points.geometry.dispose();
       explosion.points.material.dispose();
     });
     activeExplosions.length = 0;
 
     activeBeams.forEach(function (beam) {
-      scene.remove(beam.core, beam.glow, beam.muzzle, beam.pulse);
-      beam.markers.forEach(function (marker) {
-        scene.remove(marker);
-        marker.geometry.dispose();
-        marker.material.dispose();
-      });
-      beam.core.geometry.dispose();
-      beam.core.material.dispose();
-      beam.glow.geometry.dispose();
-      beam.glow.material.dispose();
-      beam.muzzle.geometry.dispose();
-      beam.muzzle.material.dispose();
+      scene.remove(beam.line, beam.pulse);
+      beam.line.geometry.dispose();
+      beam.line.material.dispose();
       beam.pulse.geometry.dispose();
       beam.pulse.material.dispose();
     });
@@ -1414,16 +945,6 @@
     missionMessage.textContent = weapon === "light"
       ? "Light blaster ready. It is quick and sparkly."
       : "Fire blaster ready. Bigger blast, warmer sound.";
-    updateMissionReport();
-  }
-
-  function stopAsteroids() {
-    activeAsteroids.forEach(function (asteroid) {
-      asteroid.active = false;
-      asteroid.mesh.visible = false;
-      asteroid.tail.visible = false;
-      asteroid.glow.visible = false;
-    });
   }
 
   function updateLeaderboardAccess() {
@@ -1500,7 +1021,6 @@
     applyControls(delta);
     updateTargeting();
     animateSystem(delta);
-    animateAsteroids(delta);
     animateBeams(delta);
     animateExplosions(delta);
 
@@ -1513,7 +1033,6 @@
     sunParts.sun.rotation.y += delta * 0.22;
     sunParts.corona.scale.setScalar(1 + Math.sin(performance.now() * 0.0038) * 0.04);
     sunParts.glow.material.rotation += delta * 0.03;
-    updateSunVisual(delta);
 
     activePlanets.forEach(function (planet) {
       planet.orbitGroup.rotation.y += delta * planet.definition.orbitSpeed * 0.18 * speed;
@@ -1523,44 +1042,13 @@
     });
   }
 
-  function animateAsteroids(delta) {
-    activeAsteroids.forEach(function (asteroid) {
-      if (!asteroid.active) {
-        if (performance.now() >= asteroid.respawnAt && !state.gameOver) {
-          respawnAsteroid(asteroid, true);
-          updateMissionReport();
-        }
-        return;
-      }
-
-      asteroid.mesh.position.addScaledVector(asteroid.velocity, delta * (0.7 + state.solarSpeed * 0.35));
-      asteroid.mesh.rotation.x += asteroid.rotationSpeed.x * delta;
-      asteroid.mesh.rotation.y += asteroid.rotationSpeed.y * delta;
-      asteroid.mesh.rotation.z += asteroid.rotationSpeed.z * delta;
-      updateAsteroidTail(asteroid);
-
-      if (asteroid.mesh.position.length() > 95 || Math.abs(asteroid.mesh.position.y) > 34) {
-        respawnAsteroid(asteroid, true);
-      }
-    });
-  }
-
   function animateBeams(delta) {
     activeBeams.forEach(function (beam) {
       beam.life -= delta;
       const ratio = Math.max(0, beam.life / beam.maxLife);
-      beam.core.material.opacity = ratio * 1.22;
-      beam.glow.material.opacity = ratio * 0.48;
-      beam.core.scale.set(1 + (1 - ratio) * 0.18, 1, 1 + (1 - ratio) * 0.18);
-      beam.glow.scale.set(1 + (1 - ratio) * 0.42, 1, 1 + (1 - ratio) * 0.42);
-      beam.markers.forEach(function (marker, index) {
-        marker.material.opacity = ratio * (1 - index * 0.12);
-        marker.scale.setScalar(1 + (1 - ratio) * (1.4 + index * 0.12));
-      });
-      beam.muzzle.material.opacity = ratio * 1.05;
-      beam.muzzle.scale.setScalar(1 + (1 - ratio) * 2.6);
+      beam.line.material.opacity = ratio * 1.2;
       beam.pulse.material.opacity = ratio * 0.9;
-      beam.pulse.scale.setScalar(1 + (1 - ratio) * 2.4);
+      beam.pulse.scale.setScalar(1 + (1 - ratio) * 1.8);
       if (beam.life <= 0) {
         beamsToRemove.push(beam);
       }
@@ -1572,18 +1060,9 @@
       if (index >= 0) {
         activeBeams.splice(index, 1);
       }
-      scene.remove(beam.core, beam.glow, beam.muzzle, beam.pulse);
-      beam.markers.forEach(function (marker) {
-        scene.remove(marker);
-        marker.geometry.dispose();
-        marker.material.dispose();
-      });
-      beam.core.geometry.dispose();
-      beam.core.material.dispose();
-      beam.glow.geometry.dispose();
-      beam.glow.material.dispose();
-      beam.muzzle.geometry.dispose();
-      beam.muzzle.material.dispose();
+      scene.remove(beam.line, beam.pulse);
+      beam.line.geometry.dispose();
+      beam.line.material.dispose();
       beam.pulse.geometry.dispose();
       beam.pulse.material.dispose();
     }
@@ -1602,18 +1081,6 @@
       explosion.points.geometry.attributes.position.needsUpdate = true;
       explosion.points.material.opacity = ratio;
       explosion.points.material.size = 0.8 + (1 - ratio) * 0.8;
-      if (explosion.burstMesh) {
-        explosion.burstMesh.material.opacity = ratio * 0.9;
-        explosion.burstMesh.scale.setScalar(1 + (1 - ratio) * 2.6);
-      }
-      if (explosion.flash) {
-        explosion.flash.material.opacity = ratio * 0.42;
-        explosion.flash.scale.setScalar(1 + (1 - ratio) * 2.2);
-      }
-      if (explosion.shockwave) {
-        explosion.shockwave.material.opacity = ratio * 0.32;
-        explosion.shockwave.scale.setScalar(1 + (1 - ratio) * 6.5);
-      }
 
       if (explosion.life <= 0) {
         particlesToRemove.push(explosion);
@@ -1627,21 +1094,6 @@
         activeExplosions.splice(index, 1);
       }
       scene.remove(explosion.points);
-      if (explosion.burstMesh) {
-        scene.remove(explosion.burstMesh);
-        explosion.burstMesh.geometry.dispose();
-        explosion.burstMesh.material.dispose();
-      }
-      if (explosion.flash) {
-        scene.remove(explosion.flash);
-        explosion.flash.geometry.dispose();
-        explosion.flash.material.dispose();
-      }
-      if (explosion.shockwave) {
-        scene.remove(explosion.shockwave);
-        explosion.shockwave.geometry.dispose();
-        explosion.shockwave.material.dispose();
-      }
       explosion.points.geometry.dispose();
       explosion.points.material.dispose();
     }

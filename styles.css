@@ -205,7 +205,6 @@ button:focus-visible {
   min-height: calc(100vh - 36px);
   border-radius: 34px;
   overflow: hidden;
-  cursor: none;
   background:
     radial-gradient(circle at center, rgba(15, 38, 79, 0.75), rgba(4, 8, 20, 0.96)),
     #040914;
@@ -223,15 +222,6 @@ button:focus-visible {
 #gameViewport {
   position: absolute;
   inset: 0;
-}
-
-#gameViewport,
-#gameViewport canvas {
-  cursor: none;
-}
-
-#gameViewport canvas {
-  display: block;
 }
 
 .top-strip {
@@ -579,73 +569,6 @@ kbd {
 
 .leaderboard-list span {
   color: var(--muted);
-}
-
-.report-panel {
-  display: grid;
-  gap: 14px;
-}
-
-.report-stats,
-.planet-report {
-  display: grid;
-  gap: 10px;
-}
-
-.planet-report {
-  grid-template-columns: 1fr;
-  overflow: hidden;
-  padding-bottom: 0;
-}
-
-.report-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(140, 205, 255, 0.12);
-}
-
-.report-card strong {
-  color: #fff7c1;
-}
-
-.report-card span {
-  color: var(--muted);
-}
-
-.planet-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(140, 205, 255, 0.1);
-}
-
-.planet-item strong {
-  color: #ffffff;
-}
-
-.planet-item span {
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.2;
-}
-
-.planet-item.critical {
-  border-color: rgba(255, 105, 110, 0.42);
-  background: rgba(255, 93, 99, 0.08);
-}
-
-.planet-item.done {
-  border-color: rgba(126, 255, 143, 0.28);
-  background: rgba(126, 255, 143, 0.08);
 }
 
 @media (max-width: 1200px) {
