@@ -18,7 +18,7 @@
       <div class="brand">
         <p class="eyebrow">Space Mission</p>
         <h1>Nick Solar System 16</h1>
-        <p class="tagline">Fly the spaceship, blast the planets, and become the galaxy champion.</p>
+        
       </div>
 
       <section class="panel">
@@ -44,22 +44,22 @@
         <h2>How To Play</h2>
         <ul>
           <li><kbd>W A S D</kbd> move like a spaceship pilot</li>
-          <li><kbd>Arrow Keys</kbd> or mouse to look around</li>
-          <li><kbd>Space</kbd> shoot your current weapon</li>
-          <li><kbd>F</kbd> fire blaster, <kbd>L</kbd> light blaster</li>
-          <li>Planets turn red when they are almost defeated</li>
+          <li><kbd>Arrow Keys</kbd> aim the ship on TV and desktop</li>
+          <li><kbd>Space</kbd> or <kbd>Enter</kbd> shoots exactly at the `+`</li>
+          <li><kbd>1</kbd>/<kbd>2</kbd> or <kbd>F</kbd>/<kbd>L</kbd> switch weapons</li>
+          <li><kbd>[</kbd>/<kbd>]</kbd> solar speed, <kbd>-</kbd>/<kbd>+</kbd> ship speed</li>
         </ul>
       </section>
     </aside>
 
     <main class="viewport-wrap">
-      <div id="gameViewport" aria-label="Nick Solar System 16 game scene"></div>
+      <div id="gameViewport" tabindex="0" aria-label="Nick Solar System 16 game scene"></div>
       <div class="top-strip hud">
         <div class="stats">
           <div class="stat"><span>Score</span><strong id="scoreValue">0</strong></div>
           <div class="stat"><span>Hits</span><strong id="hitsValue">0</strong></div>
           <div class="stat"><span>Streak</span><strong id="streakValue">0</strong></div>
-          <div class="stat"><span>Explosions</span><strong id="explosionValue">0 / 8</strong></div>
+          <div class="stat"><span>Progress</span><strong id="explosionValue">0 / 8</strong></div>
         </div>
         <div id="statusBadge" class="status-badge">Pick a target and fire!</div>
       </div>
@@ -68,7 +68,7 @@
         <div class="crosshair">
           <span></span><span></span><span></span><span></span>
         </div>
-        <div class="reticle-label">Windshield Aim</div>
+        <div class="reticle-label">Exact Center Aim</div>
       </div>
 
       <div id="celebrationOverlay" class="celebration-overlay" aria-hidden="true">
@@ -99,7 +99,7 @@
 
       <section class="panel small-panel">
         <h2>Mission Notes</h2>
-        <p id="missionMessage">Shoot all 8 planets. Big planets need many more hits than the small ones.</p>
+        <p id="missionMessage">Shoot all 8 planets, then blast the sun 5 times to win the cup.</p>
       </section>
     </aside>
   </div>

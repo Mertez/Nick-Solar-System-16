@@ -30,12 +30,18 @@
   const tempVector = new THREE.Vector3();
   const rightVector = new THREE.Vector3();
   const shotDirection = new THREE.Vector3();
+  const centerAim = Object.freeze({ x: 0, y: 0 });
   const particlesToRemove = [];
   const beamsToRemove = [];
   const activeExplosions = [];
   const activeBeams = [];
   const activePlanets = [];
   const planetMeshes = [];
+  const sunRequiredShots = 5;
+  const isTizenTvBrowser = /tizen|smart-tv|smarttv|samsungbrowser/i.test(navigator.userAgent);
+  const targetPixelRatio = isTizenTvBrowser ? 1 : Math.min(window.devicePixelRatio, 2);
+  const starCount = isTizenTvBrowser ? 1200 : 2200;
+  const explosionParticleCount = isTizenTvBrowser ? 48 : 72;
 
   const state = {
     solarSpeed: parseFloat(solarSpeedInput.value),
@@ -46,8 +52,9 @@
     streak: 0,
     explosions: 0,
     gameOver: false,
+    sunPhaseActive: false,
     pointerLocked: false,
-    hoveredPlanet: null,
+    hoveredTarget: null,
     missionStart: performance.now(),
     lastShotAt: 0,
     scoreSaved: false,
@@ -61,8 +68,12 @@
 
   const ribbonColors = ["#ff6b6b", "#ffd93d", "#6bff95", "#5cd8ff", "#b089ff", "#ff9f68"];
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({
+    antialias: !isTizenTvBrowser,
+    alpha: true,
+    powerPreference: "high-performance",
+  });
+  renderer.setPixelRatio(targetPixelRatio);
   renderer.setSize(viewport.clientWidth, viewport.clientHeight);
   viewport.appendChild(renderer.domElement);
 
@@ -136,6 +147,22 @@
   }
 
   const sunParts = createSun();
+  const sunBoss = createSunBoss();
+
+  function createSunBoss() {
+    const boss = {
+      maxHp: sunRequiredShots,
+      currentHp: sunRequiredShots,
+      flash: 0,
+      defeated: false,
+      baseColor: new THREE.Color(0xffc655),
+      warningColor: new THREE.Color(0xff5f33),
+      baseEmissive: new THREE.Color(0xff8c1a),
+      warningEmissive: new THREE.Color(0xff2d10),
+    };
+    sunParts.sun.userData.sunBoss = boss;
+    return boss;
+  }
 
   function createOrbit(radius) {
     const points = [];
@@ -263,14 +290,14 @@
   }
 
   const planetDefinitions = [
-    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 10, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
-    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 12, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
-    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 12, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
-    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 10, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
-    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 30, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
-    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 28, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
-    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 24, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
-    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 24, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
+    { name: "Mercury", size: 0.82, orbitRadius: 8.5, orbitSpeed: 1.62, spin: 1.1, hp: 3, colors: ["#7b6c61", "#b59678", "#4d3d33"], style: "rocky" },
+    { name: "Venus", size: 1.28, orbitRadius: 11.8, orbitSpeed: 1.18, spin: 0.82, hp: 3, colors: ["#edc784", "#d5914a", "#83502a"], style: "clouds" },
+    { name: "Earth", size: 1.34, orbitRadius: 15.2, orbitSpeed: 1.0, spin: 1.5, hp: 3, colors: ["#1b73c5", "#45c271", "#12426f"], style: "clouds" },
+    { name: "Mars", size: 0.96, orbitRadius: 19.1, orbitSpeed: 0.81, spin: 1.32, hp: 3, colors: ["#d77441", "#914833", "#5a3029"], style: "rocky" },
+    { name: "Jupiter", size: 3.45, orbitRadius: 28.2, orbitSpeed: 0.44, spin: 2.25, hp: 5, colors: ["#c7864a", "#f0d0aa", "#8f5331"], style: "striped" },
+    { name: "Saturn", size: 2.96, orbitRadius: 36.2, orbitSpeed: 0.33, spin: 1.95, hp: 3, colors: ["#dec27b", "#bea069", "#86673e"], style: "striped", ring: { inner: 4.2, outer: 6.6, color: 0xf5daa1, orientation: "horizontal" } },
+    { name: "Uranus", size: 2.16, orbitRadius: 44.6, orbitSpeed: 0.24, spin: 1.3, hp: 4, colors: ["#86e6eb", "#49b5d0", "#5ec7ea"], style: "clouds", tilt: 0.72 },
+    { name: "Neptune", size: 2.02, orbitRadius: 52.1, orbitSpeed: 0.18, spin: 1.4, hp: 4, colors: ["#386ef1", "#5ab5ff", "#162b86"], style: "clouds", ring: { inner: 2.8, outer: 4.5, color: 0x70c7ff, orientation: "vertical" } },
   ];
 
   planetDefinitions.forEach(createPlanet);
@@ -380,7 +407,7 @@
     const positions = [];
     const colors = [];
     const palette = [0xffffff, 0x9fd2ff, 0xfff1b5, 0x9effff];
-    for (let i = 0; i < 2200; i += 1) {
+    for (let i = 0; i < starCount; i += 1) {
       const radius = 120 + Math.random() * 130;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
@@ -429,8 +456,8 @@
     planet.bodyMesh.material.color.copy(planet.baseColor).lerp(planet.criticalColor, critical * 0.92);
     planet.bodyMesh.material.emissive.copy(planet.baseEmissive).lerp(planet.criticalEmissive, critical * 0.82);
     planet.bodyMesh.material.emissiveIntensity = 0.42 + critical * 0.95 + planet.flash * 1.1;
-    planet.halo.material.opacity = (planet.exploded ? 0 : 0.09) + critical * 0.19 + planet.flash * 0.28 + (planet === state.hoveredPlanet ? 0.14 : 0);
-    planet.label.material.opacity = planet.exploded ? 0 : planet === state.hoveredPlanet ? 1 : 0.82;
+    planet.halo.material.opacity = (planet.exploded ? 0 : 0.09) + critical * 0.19 + planet.flash * 0.28 + (planet === state.hoveredTarget ? 0.14 : 0);
+    planet.label.material.opacity = planet.exploded ? 0 : planet === state.hoveredTarget ? 1 : 0.82;
     if (planet.ring) {
       planet.ring.material.opacity = planet.exploded ? 0 : 0.58 + critical * 0.16;
       if (critical) {
@@ -441,31 +468,89 @@
     }
   }
 
-  function updateTargeting() {
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+  function updateSunVisual(delta) {
+    const finaleActive = state.sunPhaseActive && !sunBoss.defeated;
+    const hpRatio = sunBoss.currentHp / sunBoss.maxHp;
+    const critical = finaleActive && hpRatio <= 0.2 ? 1 : 0;
+    const hovered = finaleActive && state.hoveredTarget === sunBoss ? 1 : 0;
+    const pulse = 1 + Math.sin(performance.now() * 0.0038) * 0.04;
+
+    sunBoss.flash = Math.max(0, sunBoss.flash - delta * 2.2);
+    sunParts.sun.visible = !sunBoss.defeated;
+    sunParts.corona.visible = !sunBoss.defeated;
+    sunParts.glow.visible = !sunBoss.defeated;
+
+    if (sunBoss.defeated) {
+      return;
+    }
+
+    sunParts.sun.material.color.copy(sunBoss.baseColor).lerp(sunBoss.warningColor, critical * 0.84);
+    sunParts.sun.material.emissive.copy(sunBoss.baseEmissive).lerp(sunBoss.warningEmissive, critical * 0.84);
+    sunParts.sun.material.emissiveIntensity = 1.7 + critical * 0.85 + sunBoss.flash * 1.1 + hovered * 0.3;
+    sunParts.corona.material.opacity = 0.18 + (finaleActive ? 0.08 : 0) + critical * 0.16 + sunBoss.flash * 0.16 + hovered * 0.08;
+    sunParts.corona.scale.setScalar(pulse + (finaleActive ? 0.04 : 0) + critical * 0.06 + sunBoss.flash * 0.08);
+
+    const glowScale = 24 + (finaleActive ? 1.6 : 0) + critical * 2.6 + sunBoss.flash * 2.4 + hovered * 1.4;
+    sunParts.glow.scale.set(glowScale, glowScale, 1);
+  }
+
+  function getCurrentTargetHit() {
+    camera.updateMatrixWorld(true);
+    raycaster.setFromCamera(centerAim, camera);
+
+    if (state.sunPhaseActive && !sunBoss.defeated) {
+      const sunHit = raycaster.intersectObject(sunParts.sun, false)[0];
+      return sunHit ? { kind: "sun", hit: sunHit, target: sunBoss } : null;
+    }
+
     const intersects = raycaster.intersectObjects(planetMeshes, false);
-    const hit = intersects.find(function (item) {
+    const planetHit = intersects.find(function (item) {
       return item.object.userData.planet && !item.object.userData.planet.exploded;
     });
-    const nextPlanet = hit ? hit.object.userData.planet : null;
-    state.hoveredPlanet = nextPlanet && !nextPlanet.exploded ? nextPlanet : null;
+
+    return planetHit
+      ? { kind: "planet", hit: planetHit, target: planetHit.object.userData.planet }
+      : null;
+  }
+
+  function getSunWorldPosition() {
+    const position = new THREE.Vector3();
+    sunParts.sun.getWorldPosition(position);
+    return position;
+  }
+
+  function updateTargeting() {
+    const targetHit = getCurrentTargetHit();
+    state.hoveredTarget = targetHit ? targetHit.target : null;
 
     if (state.gameOver) {
-      statusBadge.textContent = "All planets popped. Save your score, then reset for another mission.";
+      statusBadge.textContent = "Sun defeated. Save your score, then reset for another mission.";
       return;
     }
 
-    if (!state.hoveredPlanet) {
-      statusBadge.textContent = state.pointerLocked
-        ? "Look around the solar system and line up a planet in the windshield."
-        : "Click the game view to steer with your mouse, or use the arrow keys.";
+    if (!targetHit) {
+      if (state.sunPhaseActive) {
+        statusBadge.textContent = hasAimControl()
+          ? "The sun is the final target. Put it in the middle and fire."
+          : "Use the arrow keys to aim, then line up the sun for the final 5 shots.";
+      } else {
+        statusBadge.textContent = hasAimControl()
+          ? "Look around the solar system and line up a planet in the windshield."
+          : "Use the arrow keys to aim and Space or Enter to shoot.";
+      }
       return;
     }
 
-    const left = Math.max(0, Math.ceil(state.hoveredPlanet.currentHp));
+    const left = Math.max(0, Math.ceil(targetHit.target.currentHp));
     const hpText = left === 1 ? "1 hit left" : left + " hits left";
-    const danger = state.hoveredPlanet.currentHp / state.hoveredPlanet.maxHp <= 0.1 ? " Hurry, it is glowing red!" : "";
-    statusBadge.textContent = "Target " + state.hoveredPlanet.definition.name + ": " + hpText + "." + danger;
+
+    if (targetHit.kind === "sun") {
+      statusBadge.textContent = "Final target Sun: " + hpText + (left === 1 ? " One more blast!" : "");
+      return;
+    }
+
+    const danger = targetHit.target.currentHp / targetHit.target.maxHp <= 0.1 ? " Hurry, it is glowing red!" : "";
+    statusBadge.textContent = "Target " + targetHit.target.definition.name + ": " + hpText + "." + danger;
   }
 
   function shoot() {
@@ -483,19 +568,15 @@
     playShotSound(state.weapon);
 
     camera.getWorldDirection(shotDirection);
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.intersectObjects(planetMeshes, false);
-    const hitTarget = intersects.find(function (item) {
-      return item.object.userData.planet && !item.object.userData.planet.exploded;
-    });
-    const target = hitTarget ? hitTarget.object.userData.planet : null;
+    const targetHit = getCurrentTargetHit();
+    const target = targetHit ? targetHit.target : null;
 
     const shotOrigin = camera.position.clone().add(shotDirection.clone().multiplyScalar(2.2));
     let endPoint = shotOrigin.clone().add(shotDirection.clone().multiplyScalar(90));
     let didHit = false;
 
-    if (target && !target.exploded) {
-      endPoint = hitTarget.point.clone();
+    if (targetHit && targetHit.kind === "planet" && !target.exploded) {
+      endPoint = targetHit.hit.point.clone();
       didHit = true;
       target.currentHp = Math.max(0, target.currentHp - 1);
       target.flash = 1;
@@ -511,9 +592,28 @@
       } else {
         missionMessage.textContent = target.definition.name + " got hit. " + Math.ceil(target.currentHp) + " hits to go.";
       }
+    } else if (targetHit && targetHit.kind === "sun" && !sunBoss.defeated) {
+      endPoint = targetHit.hit.point.clone();
+      didHit = true;
+      sunBoss.currentHp = Math.max(0, sunBoss.currentHp - 1);
+      sunBoss.flash = 1;
+      state.hits += 1;
+      state.streak += 1;
+      state.score += state.weapon === "light" ? 18 : 24;
+
+      if (sunBoss.currentHp === 0) {
+        state.score += sunBoss.maxHp * 18;
+        defeatSun(endPoint);
+      } else if (sunBoss.currentHp === 1) {
+        missionMessage.textContent = "The sun is almost done. One more shot for the cup!";
+      } else {
+        missionMessage.textContent = "Sun hit! " + sunBoss.currentHp + " shots left before the big finish.";
+      }
     } else {
       state.streak = 0;
-      missionMessage.textContent = "Missed! Try putting a planet right in the middle of the windshield.";
+      missionMessage.textContent = state.sunPhaseActive
+        ? "Missed the sun. Put it right in the middle for the final shots."
+        : "Missed! Try putting a planet right in the middle of the windshield.";
     }
 
     createBeam(shotOrigin, endPoint, state.weapon, didHit);
@@ -576,15 +676,44 @@
     createExplosionBurst(at || getPlanetWorldPosition(planet), planet.definition.colors[1]);
 
     if (state.explosions === activePlanets.length) {
-      state.gameOver = true;
-      state.scoreSaved = false;
-      const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
-      state.score += 250;
-      missionMessage.textContent = "Mission complete in " + timeSpent + "s. Rating: " + getRatingText() + ". Save your leaderboard score!";
-      showVictoryCelebration(timeSpent);
-      unlockPointer();
-      updateLeaderboardAccess();
+      activateSunFinale();
     }
+  }
+
+  function activateSunFinale() {
+    state.sunPhaseActive = true;
+    state.hoveredTarget = null;
+    sunBoss.currentHp = sunBoss.maxHp;
+    sunBoss.flash = 1;
+    missionMessage.textContent = "All planets exploded! Now blast the sun 5 times to finish the mission.";
+  }
+
+  function defeatSun(at) {
+    if (sunBoss.defeated) {
+      return;
+    }
+
+    sunBoss.defeated = true;
+    playExplosionSound();
+
+    const center = at || getSunWorldPosition();
+    createExplosionBurst(center, "#ffd15f");
+    createExplosionBurst(center.clone().add(new THREE.Vector3(1.5, 0.8, -1.2)), "#ff9a45");
+    createExplosionBurst(center.clone().add(new THREE.Vector3(-1.4, -0.6, 1.1)), "#fff1a8");
+
+    completeMission();
+  }
+
+  function completeMission() {
+    state.gameOver = true;
+    state.scoreSaved = false;
+    state.hoveredTarget = null;
+    const timeSpent = ((performance.now() - state.missionStart) / 1000).toFixed(1);
+    state.score += 250;
+    missionMessage.textContent = "Mission complete in " + timeSpent + "s. Sun defeated. Rating: " + getRatingText() + ". Save your leaderboard score!";
+    showVictoryCelebration(timeSpent);
+    unlockPointer();
+    updateLeaderboardAccess();
   }
 
   function showVictoryCelebration(timeSpent) {
@@ -594,7 +723,7 @@
     celebrationOverlay.setAttribute("aria-hidden", "false");
     viewportWrap.classList.add("victory-mode");
     victoryTitle.textContent = "Mission Complete!";
-    victorySubtitle.textContent = "Cup earned in " + timeSpent + "s. Rating " + getRatingText() + ". Save your score to the leaderboard.";
+    victorySubtitle.textContent = "Sun defeated in " + timeSpent + "s. Cup earned with rating " + getRatingText() + ". Save your score to the leaderboard.";
     createRibbons(36);
   }
 
@@ -622,7 +751,7 @@
   }
 
   function createExplosionBurst(position, color) {
-    const count = 72;
+    const count = explosionParticleCount;
     const positions = new Float32Array(count * 3);
     const velocities = new Float32Array(count * 3);
     const tint = new THREE.Color(color);
@@ -801,6 +930,11 @@
     scoreValue.textContent = String(state.score);
     hitsValue.textContent = String(state.hits);
     streakValue.textContent = String(state.streak);
+    if (state.sunPhaseActive) {
+      const sunShots = sunBoss.maxHp - sunBoss.currentHp;
+      explosionValue.textContent = state.explosions + " / " + activePlanets.length + " + Sun " + sunShots + " / " + sunBoss.maxHp;
+      return;
+    }
     explosionValue.textContent = state.explosions + " / " + activePlanets.length;
   }
 
@@ -893,16 +1027,21 @@
     state.streak = 0;
     state.explosions = 0;
     state.gameOver = false;
+    state.sunPhaseActive = false;
     state.lastShotAt = 0;
     state.missionStart = performance.now();
-    state.hoveredPlanet = null;
+    state.hoveredTarget = null;
     state.scoreSaved = false;
-    missionMessage.textContent = "Fresh mission ready. Blast all 8 planets and earn a shiny star rating.";
+    missionMessage.textContent = "Fresh mission ready. Blast all 8 planets, then shoot the sun 5 times to win the cup.";
     camera.position.set(0, 7, 58);
     mouseLook.yaw = 0;
     mouseLook.pitch = -0.12;
     hideVictoryCelebration();
     updateLeaderboardAccess();
+    sunBoss.currentHp = sunBoss.maxHp;
+    sunBoss.flash = 0;
+    sunBoss.defeated = false;
+    updateSunVisual(0);
 
     activePlanets.forEach(function (planet) {
       planet.currentHp = planet.maxHp;
@@ -934,6 +1073,7 @@
     });
     activeBeams.length = 0;
 
+    focusViewport();
     refreshHud();
   }
 
@@ -962,6 +1102,40 @@
     if (document.pointerLockElement && document.exitPointerLock) {
       document.exitPointerLock();
     }
+  }
+
+  function hasAimControl() {
+    return state.pointerLocked || isTizenTvBrowser;
+  }
+
+  function setSolarSpeed(value) {
+    const min = parseFloat(solarSpeedInput.min);
+    const max = parseFloat(solarSpeedInput.max);
+    state.solarSpeed = THREE.MathUtils.clamp(value, min, max);
+    solarSpeedInput.value = state.solarSpeed.toFixed(1);
+    solarSpeedValue.textContent = state.solarSpeed.toFixed(1) + "x";
+  }
+
+  function setShipSpeed(value) {
+    const min = parseFloat(shipSpeedInput.min);
+    const max = parseFloat(shipSpeedInput.max);
+    state.shipSpeed = THREE.MathUtils.clamp(value, min, max);
+    shipSpeedInput.value = state.shipSpeed.toFixed(1);
+    shipSpeedValue.textContent = state.shipSpeed.toFixed(1) + "x";
+  }
+
+  function focusViewport() {
+    if (typeof viewport.focus === "function" && document.activeElement !== playerNameInput) {
+      try {
+        viewport.focus({ preventScroll: true });
+      } catch (error) {
+        viewport.focus();
+      }
+    }
+  }
+
+  function isInteractiveElement(element) {
+    return !!element && (element.tagName === "INPUT" || element.tagName === "BUTTON");
   }
 
   function applyControls(delta) {
@@ -1031,8 +1205,8 @@
     const speed = state.solarSpeed;
     solarSystemRoot.rotation.y += delta * 0.025;
     sunParts.sun.rotation.y += delta * 0.22;
-    sunParts.corona.scale.setScalar(1 + Math.sin(performance.now() * 0.0038) * 0.04);
     sunParts.glow.material.rotation += delta * 0.03;
+    updateSunVisual(delta);
 
     activePlanets.forEach(function (planet) {
       planet.orbitGroup.rotation.y += delta * planet.definition.orbitSpeed * 0.18 * speed;
@@ -1117,13 +1291,11 @@
   }
 
   solarSpeedInput.addEventListener("input", function () {
-    state.solarSpeed = parseFloat(solarSpeedInput.value);
-    solarSpeedValue.textContent = state.solarSpeed.toFixed(1) + "x";
+    setSolarSpeed(parseFloat(solarSpeedInput.value));
   });
 
   shipSpeedInput.addEventListener("input", function () {
-    state.shipSpeed = parseFloat(shipSpeedInput.value);
-    shipSpeedValue.textContent = state.shipSpeed.toFixed(1) + "x";
+    setShipSpeed(parseFloat(shipSpeedInput.value));
   });
 
   resetButton.addEventListener("click", resetGame);
@@ -1143,25 +1315,37 @@
 
   viewport.addEventListener("click", function () {
     ensureAudio();
+    focusViewport();
     if (state.gameOver) {
       return;
     }
-    if (!state.pointerLocked && renderer.domElement.requestPointerLock) {
+    if (!isTizenTvBrowser && !state.pointerLocked && renderer.domElement.requestPointerLock) {
       renderer.domElement.requestPointerLock();
-    } else if (state.pointerLocked) {
+    } else if (hasAimControl()) {
       shoot();
     }
   });
 
   document.addEventListener("keydown", function (event) {
-    const typingInInput = event.target === playerNameInput;
-    if (event.code === "Space") {
+    const interactiveTarget = isInteractiveElement(event.target);
+    if (event.code === "Space" || event.code === "Enter" || event.code === "NumpadEnter") {
+      if (interactiveTarget) {
+        return;
+      }
       event.preventDefault();
       ensureAudio();
       shoot();
       return;
     }
-    if (typingInInput) {
+    if (interactiveTarget) {
+      return;
+    }
+    if (event.code === "Digit1") {
+      setWeapon("light");
+      return;
+    }
+    if (event.code === "Digit2") {
+      setWeapon("fire");
       return;
     }
     if (event.code === "KeyF") {
@@ -1172,6 +1356,26 @@
       setWeapon("light");
       return;
     }
+    if (event.code === "BracketLeft") {
+      setSolarSpeed(state.solarSpeed - 0.1);
+      return;
+    }
+    if (event.code === "BracketRight") {
+      setSolarSpeed(state.solarSpeed + 0.1);
+      return;
+    }
+    if (event.code === "Minus" || event.code === "NumpadSubtract") {
+      setShipSpeed(state.shipSpeed - 0.1);
+      return;
+    }
+    if (event.code === "Equal" || event.code === "NumpadAdd") {
+      setShipSpeed(state.shipSpeed + 0.1);
+      return;
+    }
+    if (event.code === "KeyR") {
+      resetGame();
+      return;
+    }
     keys[event.code] = true;
   });
 
@@ -1180,7 +1384,8 @@
   });
 
   mouseLook.pitch = -0.12;
-  solarSpeedValue.textContent = state.solarSpeed.toFixed(1) + "x";
-  shipSpeedValue.textContent = state.shipSpeed.toFixed(1) + "x";
+  setSolarSpeed(state.solarSpeed);
+  setShipSpeed(state.shipSpeed);
+  focusViewport();
   renderer.setAnimationLoop(animate);
 })();
